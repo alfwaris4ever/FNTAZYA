@@ -30,6 +30,25 @@ while ((m = scriptRe.exec(html))) {
 }
 ok(`تم فحص صياغة ${checked} سكربت`);
 
+// 2-ب) ملفات JavaScript المنفصلة: صياغة كل ملف، ثم كلها معاً بترتيب التحميل (يكشف تكرار نفس الاسم في ملفين)
+const srcs = [...html.matchAll(/<script[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*><\/script>/gi)].map((x) => x[1]).filter((s) => !/^(https?:|\/\/)/.test(s));
+let combined = '';
+for (const s of srcs) {
+  if (!fs.existsSync(s)) continue; // يُبلَّغ عنه في فحص المراجع
+  const code = fs.readFileSync(s, 'utf8');
+  try { new vm.Script(code, { filename: s }); } catch (e) { fail(`خطأ صياغة في ${s}: ${e.message}`); }
+  combined += '\n;\n' + code;
+}
+if (srcs.length) {
+  try { new vm.Script(combined, { filename: 'all-scripts.js' }); ok(`صياغة ${srcs.length} ملف JavaScript سليمة، ولا يوجد اسم مكرر بينها`); }
+  catch (e) { fail(`تعارض بين ملفات JavaScript (غالباً اسم معرّف مرتين في ملفين): ${e.message}`); }
+}
+// كل ملف لعبة في js/games لازم يكون مضافاً في index.html، وإلا فاللعبة لن تعمل
+if (fs.existsSync('js/games')) {
+  for (const f of fs.readdirSync('js/games')) if (f.endsWith('.js') && !srcs.includes('js/games/' + f)) fail(`الملف js/games/${f} غير مضاف في index.html`);
+  ok('كل ملفات js/games مضافة في index.html');
+}
+
 // 3) كل مرجع نسبي (src / href / url()) له ملف فعلي
 const refs = new Set();
 for (const r of html.matchAll(/\b(?:src|href)\s*=\s*["']([^"']+)["']/gi)) refs.add(r[1]);
