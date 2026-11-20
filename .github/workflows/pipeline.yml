@@ -1,9 +1,12 @@
 # سلسلة النشر: dev -> (CI) -> staging -> (CI) -> main -> رفع FTP إلى fntazya.com -> تحقق
-# أي رفع على dev يشغّل هذا الملف. لا يُرقّى أي فرع إلا بعد نجاح فحوصات المرحلة السابقة.
+# أي رفع على dev يشغّل السلسلة كاملة. لا يُرقّى أي فرع إلا بعد نجاح فحوصات المرحلة السابقة.
+# فروع الموظفين (dev-faris, dev-sama, ...) وطلبات الدمج إلى dev: تشغّل CI (dev) فقط، بدون ترقية أو نشر.
 name: Pipeline
 
 on:
   push:
+    branches: [dev, 'dev-*']
+  pull_request:
     branches: [dev]
   workflow_dispatch:
 
@@ -11,7 +14,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: pipeline
+  # dev وحده يعمل بالتسلسل (نشر). فروع الموظفين وطلبات الدمج لها مجموعة مستقلة لكل فرع.
+  group: pipeline-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -25,11 +29,13 @@ jobs:
           node-version: 22
       - name: فحص الملفات والسكربتات والمراجع
         run: node scripts/ci-check.mjs
+      - name: اختبار تشغيل الموقع في Chrome
+        run: node scripts/smoke-test.mjs
 
   promote-staging:
     name: Promote dev -> staging
     needs: ci-dev
-    if: github.ref == 'refs/heads/dev'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -106,14 +112,16 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
-      - name: مطابقة index.html على الخادم مع النسخة المنشورة
+      - name: مطابقة ملفات الموقع (html/css/js) على الخادم مع النسخة المنشورة
         run: |
-          curl -fsS --max-time 60 --user "$FTP_USER:$FTP_PASSWORD" "$FTP_URL/index.html" -o live.html
-          if cmp -s <(tr -d '\r' < index.html) <(tr -d '\r' < live.html); then
-            echo "OK: index.html على الخادم يطابق النسخة المنشورة"
-          else
-            echo "FAIL: index.html على الخادم لا يطابق"; exit 1
-          fi
+          fail=0; n=0
+          for f in index.html $(find css js -type f 2>/dev/null | sort); do
+            n=$((n+1))
+            if ! curl -fsS --max-time 60 --user "$FTP_USER:$FTP_PASSWORD" "$FTP_URL/$f" -o live.tmp; then echo "FAIL غير موجود على الخادم: $f"; fail=1; continue; fi
+            cmp -s <(tr -d '\r' < "$f") <(tr -d '\r' < live.tmp) || { echo "FAIL لا يطابق: $f"; fail=1; }
+          done
+          [ $fail = 0 ] && echo "OK: $n ملف على الخادم يطابق النسخة المنشورة"
+          exit $fail
       - name: التأكد من وجود كل صور الألعاب على الخادم
         run: |
           curl -fsS --max-time 60 --user "$FTP_USER:$FTP_PASSWORD" --list-only "$FTP_URL/thumbs/" > remote.txt
