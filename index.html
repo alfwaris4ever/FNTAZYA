@@ -793,6 +793,13 @@ a{color:inherit;text-decoration:none}
 .ch-card.pop{animation:pop .3s}
 .sub-tile div{display:flex;flex-direction:column;line-height:1.15}.sub-tile small{font-size:.7em;opacity:.9;font-weight:700}
 .sub-tile{outline:3px solid rgba(255,255,255,.55);outline-offset:-3px}
+.sub-row{grid-column:1/-1;display:flex;align-items:stretch;gap:var(--gap);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding:8px 8px;margin:-8px -8px}
+.sub-row::-webkit-scrollbar{display:none}
+.sub-row .sub-tile{flex:1 1 0;min-width:170px;position:relative}
+@media (max-width:599px){.sub-row .sub-tile{min-width:150px;font-size:15px;padding:0 10px}.sub-row .sub-tile span{font-size:30px}}
+.sub-row .sub-tile:not(.on){filter:saturate(.85);opacity:.92}
+.sub-row .sub-tile.on{outline:4px solid #fff;outline-offset:-4px;box-shadow:0 0 0 4px var(--c1),var(--shadow);filter:none;opacity:1}
+.sub-row .sub-tile.on::after{content:"✔ أنت هنا";position:absolute;top:8px;inset-inline-end:10px;background:#fff;color:#1d2350;font-size:11px;font-weight:800;border-radius:99px;padding:2px 8px;box-shadow:0 2px 0 rgba(0,0,0,.12)}
 .mark-img{object-fit:cover;padding:0;background:none!important;transform:rotate(-6deg);box-shadow:0 4px 10px rgba(91,60,255,.35)}
 </style>
 </head>
@@ -2626,11 +2633,13 @@ function showHome(cat){
   if(cat&&CATS[cat]){const C=CATS[cat];
     list=cat==='fav'?GAMES.filter(g=>favs.has(g.id)):cat==='recent'?recent().map(id=>GAMES.find(g=>g.id===id)).filter(Boolean):GAMES.filter(g=>cat==='brain'?BRAIN_SUBS.includes(g.cat):g.cat===cat);
     head=`<div class="cat-head" style="--c1:${C.c[0]};--c2:${C.c[1]}"><span>${C.e}</span><div><h1>${C.t}</h1><small>${list.length} ${list.length===1?'لعبة':'ألعاب'}</small></div></div>`;
-    if(cat==='brain'||BRAIN_SUBS.includes(cat))head+=['brain',...BRAIN_SUBS].filter(k=>k!==cat).map(k=>{const S=CATS[k],n=k==='brain'?GAMES.filter(g=>BRAIN_SUBS.includes(g.cat)).length:GAMES.filter(g=>g.cat===k).length;return `<a class="cat-tile sub-tile" href="#/cat/${k}" style="--c1:${S.c[0]};--c2:${S.c[1]}"><span>${S.e}</span><div>${S.t}<small>${n} لعبة</small></div></a>`}).join('');
+    /* أقسام الذكاء: صف ثابت الترتيب والأحجام، والقسم الحالي مميّز بإطار، والألعاب تحته */
+    if(cat==='brain'||BRAIN_SUBS.includes(cat))head=`<div class="sub-row" role="tablist" aria-label="أقسام ألعاب الذكاء">${['brain',...BRAIN_SUBS].map(k=>{const S=CATS[k],n=k==='brain'?GAMES.filter(g=>BRAIN_SUBS.includes(g.cat)).length:GAMES.filter(g=>g.cat===k).length;return `<a class="cat-tile sub-tile${k===cat?' on':''}"${k===cat?' aria-current="page"':''} href="#/cat/${k}" style="--c1:${S.c[0]};--c2:${S.c[1]}"><span>${S.e}</span><div>${S.t}<small>${n} لعبة</small></div></a>`}).join('')}</div>`;
     if(!list.length)head+=`<div class="empty">${cat==='fav'?'اضغط 🤍 داخل أي لعبة لإضافتها هنا':'لا توجد ألعاب هنا بعد'}</div>`;
     document.title=`${C.t} | فنتازيا`;
   }else document.title='فنتازيا | ألعاب أطفال مجانية بالعربي';
   grid.insertAdjacentHTML('beforeend',head+list.map(g=>tile(g,!!cat)).join('')+(cat?'':SOON.map(soonTile).join('')));
+  grid.querySelector('.sub-row .sub-tile.on')?.scrollIntoView({block:'nearest',inline:'center'});
   scrollTo(0,0);
 }
 function renderInfo(g){const C=CATS[g.cat];
