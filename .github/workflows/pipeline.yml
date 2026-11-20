@@ -1,0 +1,68 @@
+# سلسلة النشر: dev -> (CI) -> staging -> (CI) -> main -> النشر المباشر على fntazya.com
+# أي رفع على dev يشغّل هذا الملف. لا يُرقّى أي فرع إلا بعد نجاح فحوصات المرحلة السابقة.
+name: Pipeline
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  ci-dev:
+    name: CI (dev)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: فحص الملفات والسكربتات والمراجع
+        run: node scripts/ci-check.mjs
+
+  promote-staging:
+    name: Promote dev -> staging
+    needs: ci-dev
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: ترقية نفس الـ commit إلى staging
+        run: git push origin "${GITHUB_SHA}:refs/heads/staging"
+
+  ci-staging:
+    name: CI (staging)
+    needs: promote-staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+      - name: التأكد أن staging هو نفس الـ commit المختبر
+        run: test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: الفحوصات الأساسية
+        run: node scripts/ci-check.mjs
+      - name: اختبار تشغيل الموقع في Chrome
+        run: node scripts/smoke-test.mjs
+
+  promote-main:
+    name: Promote staging -> main
+    needs: ci-staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: ترقية نفس الـ commit إلى main (ينشره Hostinger تلقائياً)
+        run: git push origin "${GITHUB_SHA}:refs/heads/main"
