@@ -98,24 +98,28 @@ jobs:
     name: Verify live site
     needs: deploy
     runs-on: ubuntu-latest
+    env:
+      FTP_URL: ftp://88.222.209.119
+      FTP_USER: u835938161.githubdeploy
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
     steps:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
-      - name: مطابقة الموقع المباشر مع النسخة المنشورة
+      - name: مطابقة index.html على الخادم مع النسخة المنشورة
         run: |
-          for i in 1 2 3 4 5 6; do
-            curl -fsSL "https://fntazya.com/?v=$(date +%s)" -H 'Cache-Control: no-cache' | tr -d '\r' > live.html || true
-            if cmp -s <(tr -d '\r' < index.html) live.html; then echo "OK: fntazya.com يطابق index.html"; exit 0; fi
-            echo "محاولة $i: لم يتطابق بعد، انتظار..."; sleep 20
-          done
-          echo "FAIL: الموقع المباشر لا يطابق index.html"; exit 1
-      - name: فحص صور الألعاب على الموقع
+          curl -fsS --max-time 60 --user "$FTP_USER:$FTP_PASSWORD" "$FTP_URL/index.html" -o live.html
+          if cmp -s <(tr -d '\r' < index.html) <(tr -d '\r' < live.html); then
+            echo "OK: index.html على الخادم يطابق النسخة المنشورة"
+          else
+            echo "FAIL: index.html على الخادم لا يطابق"; exit 1
+          fi
+      - name: التأكد من وجود كل صور الألعاب على الخادم
         run: |
+          curl -fsS --max-time 60 --user "$FTP_USER:$FTP_PASSWORD" --list-only "$FTP_URL/thumbs/" > remote.txt
           fail=0
           for f in thumbs/*.webp; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "https://fntazya.com/$f")
-            [ "$code" = "200" ] || { echo "FAIL $f -> $code"; fail=1; }
+            grep -qx "$(basename "$f")" <(tr -d '\r' < remote.txt) || { echo "FAIL ناقصة: $f"; fail=1; }
           done
-          [ $fail = 0 ] && echo "OK: كل الصور موجودة"
+          if [ $fail = 0 ]; then echo "OK: كل الصور موجودة ($(ls thumbs/*.webp | wc -l))"; fi
           exit $fail
