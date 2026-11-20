@@ -17,7 +17,7 @@ const dom = run.stdout || '', log = run.stderr || '';
 if (!dom) { console.log('FAIL تعذّر تشغيل Chrome:', run.error?.message || log.slice(-2000)); process.exit(1); }
 
 const errors = [];
-const ids = [...new Set([...dom.matchAll(/href="#\/play\/([^"]+)"/g)].map((m) => m[1]))];
+const ids = [...new Set([...dom.matchAll(/href="#\/play\/([A-Za-z0-9_-]+)"/g)].map((m) => m[1]))];
 console.log(`عدد الألعاب الظاهرة في الصفحة الرئيسية: ${ids.length}`);
 if (ids.length < MIN_GAMES) errors.push(`عدد الألعاب أقل من ${MIN_GAMES}، يبدو أن الصفحة لم تُعرض بشكل صحيح`);
 for (const id of ids) if (!fs.existsSync(`thumbs/${id}.webp`)) errors.push(`لا توجد صورة للعبة: thumbs/${id}.webp`);
