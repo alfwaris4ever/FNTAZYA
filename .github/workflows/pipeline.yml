@@ -81,7 +81,7 @@ jobs:
       - name: رفع ملفات الموقع إلى Hostinger عبر FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ftp.fntazya.com
+          server: 88.222.209.119
           username: u835938161.githubdeploy
           password: ${{ secrets.FTP_PASSWORD }}
           port: 21
