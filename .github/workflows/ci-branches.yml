@@ -1,0 +1,30 @@
+# فحص فروع الموظفين (dev-faris, dev-sama, ...) وطلبات الدمج إلى dev.
+# يشغّل نفس فحوصات CI (dev) فقط، بدون أي ترقية أو نشر. نجاحه شرط لدمج الـ Pull Request في dev.
+name: CI branches
+
+on:
+  push:
+    branches: ['dev-*']
+  pull_request:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci-dev:
+    name: CI (dev)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: فحص الملفات والسكربتات والمراجع
+        run: node scripts/ci-check.mjs
+      - name: اختبار تشغيل الموقع في Chrome
+        run: node scripts/smoke-test.mjs
