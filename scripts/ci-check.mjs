@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import { spawnSync } from 'node:child_process';
 
 const errors = [];
 const ok = (m) => console.log('OK   ' + m);
@@ -47,6 +48,16 @@ if (srcs.length) {
 if (fs.existsSync('js/games')) {
   for (const f of fs.readdirSync('js/games')) if (f.endsWith('.js') && !srcs.includes('js/games/' + f)) fail(`الملف js/games/${f} غير مضاف في index.html`);
   ok('كل ملفات js/games مضافة في index.html');
+}
+
+// 2-ج) ملفات PHP (واجهة الحسابات): فحص الصياغة بـ php -l إن كان PHP متوفراً
+if (fs.existsSync('api')) {
+  const phpOk = spawnSync('php', ['-v'], { encoding: 'utf8' }).status === 0;
+  for (const f of fs.readdirSync('api').filter((x) => x.endsWith('.php'))) {
+    if (!phpOk) { ok('PHP غير متوفر، تخطّي فحص ' + f); continue; }
+    const r = spawnSync('php', ['-l', 'api/' + f], { encoding: 'utf8' });
+    r.status === 0 ? ok('صياغة api/' + f + ' سليمة') : fail('خطأ صياغة في api/' + f + ': ' + (r.stdout + r.stderr).trim());
+  }
 }
 
 // 3) كل مرجع نسبي (src / href / url()) له ملف فعلي
