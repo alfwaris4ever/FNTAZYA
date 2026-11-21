@@ -84,8 +84,33 @@ function sendMail(string $email, string $subject, string $title, string $bodyHtm
     . "Content-Type: multipart/alternative; boundary=\"$b\"\r\n";
   $msg = "--$b\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($text))
     . "--$b\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($html)) . "--$b--\r\n";
-  return @mail($email, '=?UTF-8?B?' . base64_encode($subject) . '?=', $msg, $headers, '-fno-reply@fntazya.com');
+  $subj = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+  $cfg = smtpConfig();
+  if ($cfg && smtpSend($cfg, $email, $subj, $headers, $msg)) return true;
+  return @mail($email, $subj, $msg, $headers, '-fno-reply@fntazya.com');
 }
+
+/* إرسال عبر SMTP لصندوق no-reply@fntazya.com (أوثق من mail()). الإعدادات في api/smtp-config.php يكتبها النشر من سرّ GitHub، وليست في المستودع */
+function smtpConfig(): ?array { $f = __DIR__ . '/smtp-config.php'; if (!is_file($f)) return null; $c = include $f; return is_array($c) && !empty($c['pass']) ? $c : null; }
+function smtpSend(array $cfg, string $to, string $subjectEnc, string $headers, string $body): bool {
+  $host = $cfg['host'] ?? 'smtp.hostinger.com'; $port = (int)($cfg['port'] ?? 465); $user = $cfg['user'] ?? 'no-reply@fntazya.com';
+  $fp = @stream_socket_client("ssl://$host:$port", $en, $es, 15);
+  if (!$fp) { error_log("smtp connect: $es"); return false; }
+  stream_set_timeout($fp, 15);
+  $read = function () use ($fp) { $r = ''; while (($l = fgets($fp, 1024)) !== false) { $r .= $l; if (isset($l[3]) && $l[3] === ' ') break; } return $r; };
+  $cmd = function (string $c, string $ok) use ($fp, $read) { fwrite($fp, $c . "\r\n"); $r = $read(); if (strpos($r, $ok) !== 0) throw new RuntimeException(trim($c === '' ? '' : explode(' ', $c)[0]) . ' => ' . trim($r)); return $r; };
+  try {
+    $g = $read(); if (strpos($g, '220') !== 0) throw new RuntimeException('greet ' . $g);
+    $cmd('EHLO fntazya.com', '250');
+    $cmd('AUTH LOGIN', '334'); $cmd(base64_encode($user), '334'); $cmd(base64_encode((string)$cfg['pass']), '235');
+    $cmd("MAIL FROM:<$user>", '250'); $cmd("RCPT TO:<$to>", '25'); $cmd('DATA', '354');
+    $data = "Date: " . date('r') . "\r\nTo: <$to>\r\nSubject: $subjectEnc\r\nMessage-ID: <" . bin2hex(random_bytes(12)) . "@fntazya.com>\r\n" . $headers . "\r\n" . $body;
+    $data = preg_replace('/^\./m', '..', $data);
+    $cmd($data . "\r\n.", '250'); $cmd('QUIT', '221');
+    fclose($fp); return true;
+  } catch (Throwable $e) { error_log('smtp: ' . $e->getMessage()); @fclose($fp); return false; }
+}
+
 function welcomeMail(string $email, string $name, string $avatar): void {
   $n = h($name);
   $body = '<p style="font-size:16px;line-height:1.9;margin:0 0 12px">مرحباً،</p>'
@@ -164,7 +189,7 @@ try {
 
   switch ($a) {
     case 'ping':
-      db(); out(['ok' => true]);
+      db(); out(['ok' => true, 'mail' => smtpConfig() ? 'smtp' : 'php-mail']);
 
     case 'register': {
       $email = cleanEmail($b['email'] ?? ''); $pin = cleanPin($b['pin'] ?? '');
