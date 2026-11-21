@@ -21,6 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: التأكد أن كل فرع يرفع عليه صاحبه فقط (.github/branch-owners.json)
+        env:
+          BR: ${{ github.head_ref || github.ref_name }}
+          WHO: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login || github.actor }}
+        run: |
+          ALLOWED=$(jq -r --arg b "$BR" '.[$b] // [] | join(" ")' .github/branch-owners.json)
+          if [ -z "$ALLOWED" ]; then echo "لا يوجد صاحب مسجّل للفرع $BR، تم التخطي"; exit 0; fi
+          for u in $ALLOWED alfwaris4ever; do
+            if [ "$u" = "$WHO" ]; then echo "OK: $WHO يعمل على فرعه $BR"; exit 0; fi
+          done
+          echo "FAIL: الفرع $BR خاص بـ $ALLOWED، لكن الذي رفع أو فتح الطلب هو $WHO"; exit 1
       - uses: actions/setup-node@v5
         with:
           node-version: 22
