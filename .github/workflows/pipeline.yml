@@ -96,6 +96,16 @@ jobs:
             .github/**
             scripts/**
             **/*.md
+      - name: إعداد بريد الموقع (SMTP) من سرّ GitHub
+        env:
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        run: |
+          if [ -z "$SMTP_PASSWORD" ]; then echo "لا يوجد سرّ SMTP_PASSWORD، تخطّي"; exit 0; fi
+          php -r 'file_put_contents("smtp-config.php", "<?php\nreturn " . var_export(["host"=>"smtp.hostinger.com","port"=>465,"user"=>"no-reply@fntazya.com","pass"=>getenv("SMTP_PASSWORD")], true) . ";\n");'
+          curl -fsS --max-time 60 --user "u835938161.githubdeploy:$FTP_PASSWORD" -T smtp-config.php "ftp://88.222.209.119/api/smtp-config.php"
+          rm -f smtp-config.php
+          echo "OK: تم إعداد بريد الموقع"
 
   verify-live:
     name: Verify live site
