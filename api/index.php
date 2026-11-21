@@ -47,6 +47,66 @@ SQL);
   return $pdo;
 }
 
+
+/* ---------- البريد: قالب احترافي موحّد + رابط إيقاف الرسائل في كل رسالة ---------- */
+const SITE_URL = 'https://fntazya.com';
+function secretKey(): string {
+  $f = dataDir() . '/secret.key';
+  if (!is_file($f)) { @file_put_contents($f, bin2hex(random_bytes(32))); @chmod($f, 0600); }
+  return trim((string)@file_get_contents($f));
+}
+function unsubToken(string $email): string { return substr(hash_hmac('sha256', strtolower($email), secretKey()), 0, 32); }
+function unsubUrl(string $email): string { return SITE_URL . '/api/index.php?a=unsub&e=' . rawurlencode($email) . '&t=' . unsubToken($email); }
+function h(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
+function sendMail(string $email, string $subject, string $title, string $bodyHtml, string $bodyText): bool {
+  $u = unsubUrl($email);
+  $html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+   . '<body style="margin:0;padding:0;background:#eef1ff;font-family:Tahoma,Arial,sans-serif;color:#1d2350">'
+   . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1ff;padding:24px 10px"><tr><td align="center">'
+   . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:22px;overflow:hidden;box-shadow:0 8px 24px rgba(29,35,80,.12)">'
+   . '<tr><td align="center" style="background:linear-gradient(135deg,#5b3cff,#ec4899);background-color:#6d3cf0;padding:28px 20px">'
+   . '<img src="' . SITE_URL . '/icon-192.png" width="84" height="84" alt="فنتازيا" style="display:block;border-radius:20px;border:0">'
+   . '<div style="color:#ffffff;font-size:28px;font-weight:bold;margin-top:10px">فنتازيا</div>'
+   . '<div style="color:#fde68a;font-size:14px;margin-top:2px">وقت اللعب الصح · fntazya.com</div></td></tr>'
+   . '<tr><td dir="rtl" style="padding:28px 26px 10px;text-align:right">'
+   . '<h1 style="margin:0 0 12px;font-size:22px;color:#1d2350">' . h($title) . '</h1>' . $bodyHtml . '</td></tr>'
+   . '<tr><td align="center" style="padding:8px 26px 26px"><a href="' . SITE_URL . '" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;font-weight:bold;font-size:18px;padding:12px 34px;border-radius:99px">▶ العب الآن</a></td></tr>'
+   . '<tr><td dir="rtl" style="background:#f8fafc;padding:16px 22px;text-align:center;font-size:12px;color:#64748b;line-height:1.8">'
+   . 'وصلتك هذه الرسالة لأنك سجّلت بريدك في موقع فنتازيا.<br>'
+   . 'لإيقاف الرسائل من موقع فنتازيا انقر على الرابط أدناه<br>'
+   . '<a href="' . h($u) . '" style="color:#5b3cff;font-weight:bold">إيقاف الرسائل</a></td></tr>'
+   . '</table></td></tr></table></body></html>';
+  $text = $bodyText . "\n\n" . SITE_URL . "\n\n---\nلإيقاف الرسائل من موقع فنتازيا انقر على الرابط أدناه\n" . $u . "\n";
+  $b = 'fz' . bin2hex(random_bytes(8));
+  $headers = "From: =?UTF-8?B?" . base64_encode('فنتازيا') . "?= <no-reply@fntazya.com>\r\n"
+    . "Reply-To: no-reply@fntazya.com\r\nMIME-Version: 1.0\r\n"
+    . "List-Unsubscribe: <" . $u . ">\r\n"
+    . "Content-Type: multipart/alternative; boundary=\"$b\"\r\n";
+  $msg = "--$b\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($text))
+    . "--$b\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($html)) . "--$b--\r\n";
+  return @mail($email, '=?UTF-8?B?' . base64_encode($subject) . '?=', $msg, $headers, '-fno-reply@fntazya.com');
+}
+function welcomeMail(string $email, string $name, string $avatar): void {
+  $n = h($name);
+  $body = '<p style="font-size:16px;line-height:1.9;margin:0 0 12px">مرحباً،</p>'
+    . '<p style="font-size:16px;line-height:1.9;margin:0 0 14px">تم تسجيل حساب <b>' . h($avatar) . ' ' . $n . '</b> في موقع فنتازيا <b style="color:#16a34a">بنجاح</b> 🎉</p>'
+    . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border-radius:16px;margin:4px 0 14px"><tr><td style="padding:14px 18px;font-size:15px;line-height:2">'
+    . '💾 مراحل اللعب صارت محفوظة في الحساب<br>📱 يقدر يكمل اللعب من أي جهاز بنفس البريد والرمز<br>✨ نقترح له ألعاباً تناسب اهتماماته<br>🧠 أكثر من 75 لعبة: ذكاء، ذاكرة، تعليم، حركة وغيرها'
+    . '</td></tr></table>'
+    . '<p style="font-size:13px;line-height:1.8;color:#64748b;margin:0">🔒 احتفظ بالرمز المكوّن من 4 أرقام الذي اخترتموه عند التسجيل. إن نسيتموه اضغطوا «نسيت الرمز؟» في الموقع.</p>';
+  $text = "مرحباً،\nتم تسجيل حساب $name في موقع فنتازيا بنجاح.\n- مراحل اللعب صارت محفوظة\n- يكمل اللعب من أي جهاز بنفس البريد والرمز\n- نقترح له ألعاباً تناسبه";
+  sendMail($email, 'تم تسجيل حسابك في فنتازيا بنجاح 🎉', 'أهلاً بكم في فنتازيا!', $body, $text);
+}
+function htmlPage(string $title, string $msg): void {
+  header('Content-Type: text/html; charset=utf-8');
+  echo '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . h($title) . ' | فنتازيا</title><link rel="icon" href="/favicon.png"></head>'
+   . '<body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#eef1ff;font-family:Tahoma,Arial,sans-serif;color:#1d2350">'
+   . '<div style="background:#fff;border-radius:24px;padding:30px 26px;max-width:420px;margin:16px;text-align:center;box-shadow:0 8px 24px rgba(29,35,80,.12)">'
+   . '<img src="/icon-192.png" width="80" height="80" alt="" style="border-radius:20px"><h1 style="font-size:22px">' . h($title) . '</h1><p style="line-height:1.9;color:#555b85">' . $msg . '</p>'
+   . '<a href="/" style="display:inline-block;margin-top:8px;background:#5b3cff;color:#fff;text-decoration:none;font-weight:bold;padding:10px 26px;border-radius:99px">العودة إلى فنتازيا</a></div></body></html>';
+  exit;
+}
+
 function body(): array { $j = json_decode(file_get_contents('php://input') ?: '{}', true); return is_array($j) ? $j : []; }
 function ip(): string { return substr($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? '', 0, 64); }
 function cleanEmail($e): string { $e = strtolower(trim((string)$e)); if (!filter_var($e, FILTER_VALIDATE_EMAIL) || strlen($e) > 120) fail('اكتب بريداً صحيحاً'); return $e; }
@@ -99,7 +159,7 @@ function checkLimit(string $email): void {
 
 try {
   $a = $_GET['a'] ?? '';
-  if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $a !== 'ping') fail('طلب غير صالح', 405);
+  if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $a !== 'ping' && $a !== 'unsub') fail('طلب غير صالح', 405);
   $b = body();
 
   switch ($a) {
@@ -116,6 +176,7 @@ try {
         ->execute([$email, password_hash($pin, PASSWORD_DEFAULT), cleanName($b['name'] ?? ''), cleanAvatar($b['avatar'] ?? ''), !empty($b['marketing']) ? 1 : 0, time(), time(), json_encode($prog, JSON_UNESCAPED_UNICODE)]);
       $uid = (int)db()->lastInsertId();
       $u = db()->query("SELECT * FROM users WHERE id=$uid")->fetch();
+      try { welcomeMail($email, (string)$u['name'], (string)$u['avatar']); } catch (Throwable $e) { error_log('welcome mail: ' . $e->getMessage()); }
       out(['ok' => true, 'token' => newToken($uid), 'user' => profile($u), 'progress' => $prog]);
     }
 
@@ -181,9 +242,9 @@ try {
       if ($u) {
         $pin = str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
         db()->prepare('UPDATE users SET pin_hash=? WHERE id=?')->execute([password_hash($pin, PASSWORD_DEFAULT), $u['id']]);
-        $sub = '=?UTF-8?B?' . base64_encode('رمز الدخول الجديد - فنتازيا') . '?=';
-        $msg = "مرحباً،\n\nرمز الدخول الجديد لحساب طفلك في موقع فنتازيا هو: $pin\n\nيمكن تغييره لاحقاً من لوحة اللاعب.\nhttps://fntazya.com\n";
-        @mail($email, $sub, $msg, "From: Fntazya <no-reply@fntazya.com>\r\nContent-Type: text/plain; charset=UTF-8\r\n");
+        sendMail($email, 'رمز الدخول الجديد - فنتازيا', 'رمز الدخول الجديد',
+          '<p style="font-size:16px;line-height:1.9">طلبتم رمزاً جديداً لحساب طفلكم في فنتازيا. الرمز الجديد هو:</p><div style="text-align:center;margin:14px 0"><span style="display:inline-block;letter-spacing:10px;font-size:34px;font-weight:bold;background:#f5f3ff;color:#5b3cff;border-radius:16px;padding:10px 24px" dir="ltr">' . $pin . '</span></div><p style="font-size:13px;color:#64748b">يمكن تغييره لاحقاً من لوحة اللاعب.</p>',
+          "رمز الدخول الجديد لحساب طفلكم في فنتازيا: $pin");
       }
       out(['ok' => true]); // نفس الرد دائماً حتى لا نكشف هل البريد مسجّل
     }
@@ -214,6 +275,14 @@ SELECT u.name, u.avatar, CASE WHEN u.marketing=1 THEN u.email ELSE substr(u.emai
                           (SELECT e.cat FROM events e WHERE e.user_id=u.id AND e.cat<>'' GROUP BY e.cat ORDER BY COUNT(*) DESC LIMIT 1) favcat
                          FROM users u ORDER BY u.last_seen DESC LIMIT 300
 SQL)]);
+    }
+
+    case 'unsub': {
+      $email = strtolower(trim((string)($_GET['e'] ?? '')));
+      $t = (string)($_GET['t'] ?? '');
+      if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !hash_equals(unsubToken($email), $t)) htmlPage('رابط غير صالح', 'هذا الرابط غير صحيح أو ناقص. انسخ الرابط كاملاً من الرسالة وجرّب مرة ثانية.');
+      db()->prepare('UPDATE users SET marketing=0 WHERE email=?')->execute([$email]);
+      htmlPage('تم إيقاف الرسائل ✅', 'لن تصلكم رسائل جديد الألعاب من فنتازيا بعد الآن.<br>حساب اللاعب وتقدّمه يبقيان كما هما، ويمكنكم إعادة التفعيل من لوحة اللاعب في أي وقت.');
     }
 
     default:
