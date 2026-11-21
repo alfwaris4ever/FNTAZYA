@@ -1,7 +1,8 @@
 /* فنتازيا: دوال وبيانات مشتركة تستخدمها أكثر من لعبة. تعديل أي شيء هنا يؤثر على عدة ألعاب. */
 /* أسئلة: عدد الأسئلة يزيد من 5 إلى 10، والمؤقت يبدأ من الدرجة 9 ويقصر تدريجياً */
-function quiz(root,c,{make}){
-  const total=c.fi(5,10),tl=c.lv<8?0:Math.round(c.f(22,6));let q=0,score=0,left=0,lock=true;
+/* secs (اختياري): وقت ثابت لكل سؤال بالثواني يظهر كشريط في الأسفل. بدونه يبدأ الوقت من الدرجة 9 ويقصر تدريجياً */
+function quiz(root,c,{make,secs}){
+  const total=c.fi(5,10),tl=secs!=null?secs:(c.lv<8?0:Math.round(c.f(22,6)));let q=0,score=0,left=0,lock=true;
   root.innerHTML=`<div class="hud">${c.tag}<span class="pill">❓ <b class="qn">0</b> من ${total}</span><span class="pill">⭐ <b class="sc">0</b></span></div><div class="body"${tl?' style="bottom:36px"':''}><div class="quiz"><div class="q"></div><div class="choices"></div></div></div>${tl?'<div class="tbar" role="progressbar" aria-label="الوقت المتبقي"><i></i></div>':''}`;
   const $q=root.querySelector('.q'),$ch=root.querySelector('.choices'),bar=root.querySelector('.tbar'),fill=bar?.firstElementChild;
   const paint=()=>{const p=Math.max(0,left/(tl*1000));fill.style.width=(p*100)+'%';bar.classList.toggle('low',p<=.3)};
