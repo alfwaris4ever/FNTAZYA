@@ -1,0 +1,9 @@
+# فنتازيا: لا تجعل المتصفح يحتفظ بنسخة قديمة من ملفات الموقع بعد كل نشر (يتحقق من الخادم في كل زيارة، والرد 304 سريع)
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html?|css|js)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "\.(webp|png|jpe?g|svg|ico)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+</IfModule>
