@@ -45,7 +45,7 @@ function topCatName(){const sc=catScores(),k=Object.keys(sc).sort((a,b)=>sc[b]-s
 /* على الصفحة الرئيسية: تُقدَّم الألعاب المقترحة إلى أول الشبكة بشارة «يناسبك» */
 {const sh=showHome;window.showHome=function(cat){const r=sh.apply(this,arguments);try{if(!cat)markRecommended()}catch(e){}return r}}
 function markRecommended(){const recs=recommended(4);if(!recs.length)return;const grid=$('#grid'),anchor=grid.querySelector('.cat-bar')||grid.querySelector('.logo-card');let after=anchor;
-  for(const g of recs){const t=grid.querySelector(`a.tile[href="#/play/${g.id}"]`);if(!t)continue;t.querySelector('.badge')?.remove();t.insertAdjacentHTML('beforeend','<span class="badge rec-badge">✨ يناسبك</span>');after.after(t);after=t}}
+  for(const g of recs){const t=grid.querySelector(`a.tile[href="#/play/${g.id}"]`);if(!t)continue;t.querySelector('.badge')?.remove();t.querySelector('.rec-ribbon')?.remove();t.insertAdjacentHTML('beforeend','<span class="rec-ribbon" aria-label="يناسبك"><b>يناسبك ⭐</b></span>');after.after(t);after=t}}
 
 /* ---------- الواجهة ---------- */
 function renderAccBtn(){let b=$('#accBtn');if(!b){const box=$('.logo-actions');if(!box)return;b=h('<button class="icon-btn acc-btn" id="accBtn"></button>');box.append(b);b.onclick=()=>ACC.token?openDashboard():openAuth()}
@@ -98,10 +98,12 @@ function openDashboard(){const u=ACC.user||{};let stars=0,stages=0,trophies=0;co
     ${recent.length?`<h3>▶ كمّل من حيث وقفت</h3><div class="acc-row">${recent.map(mini).join('')}</div>`:''}
     ${cats.length?`<h3>💪 نقاط قوتك</h3><div class="acc-bars">${cats.map(([k,v])=>`<div><span>${CATS[k]?.e||''} ${esc(CATS[k]?.t||k)}</span><i style="--w:${Math.round(v/tot*100)}%;--c1:${CATS[k]?.c[0]||'#6366f1'};--c2:${CATS[k]?.c[1]||'#a5b4fc'}"></i></div>`).join('')}</div>`:''}
     ${recs.length?`<h3>✨ مقترحة لك${tc?` لأنك تحب ${esc(tc.t)}`:''}</h3><div class="acc-row">${recs.map(mini).join('')}</div>`:''}
+    <label class="acc-mk"><input type="checkbox" data-mk${u.marketing?' checked':''}> 📬 استلام جديد الألعاب على بريد ولي الأمر</label>
     <div class="acc-btns small">${u.admin?'<a class="play-btn" href="admin.html">📊 لوحة الإدارة</a>':''}<button class="play-btn alt" data-pin>🔑 تغيير الرمز</button><button class="play-btn alt" data-out>🚪 خروج</button></div>
     <button class="acc-link danger" data-del>حذف الحساب وبياناته</button>`);
   ov.querySelectorAll('.acc-g').forEach(a=>a.addEventListener('click',()=>ov.remove()));
   ov.querySelector('[data-out]').onclick=async()=>{await accFlush();try{await accCall('logout',{},true)}catch{}ACC.token='';ACC.user=null;ov.remove();renderAccBtn();toast('سجّلت الخروج. تقدّمك محفوظ في حسابك 👋')};
+  ov.querySelector('[data-mk]').onchange=async e=>{try{const j=await accCall('update',{name:u.name,avatar:u.avatar,marketing:e.target.checked},true);ACC.user=j.user;toast(e.target.checked?'تم التفعيل 📬':'تم إيقاف الرسائل')}catch(er){e.target.checked=!e.target.checked;toast(er.message)}};
   ov.querySelector('[data-pin]').onclick=async()=>{const p=prompt('اكتب الرمز الجديد (4 أرقام)');if(p==null)return;if(!/^\d{4}$/.test(p.trim()))return toast('الرمز لازم يكون 4 أرقام');try{await accCall('setpin',{pin:p.trim()},true);toast('تم تغيير الرمز 🔑')}catch(e){toast(e.message)}};
   ov.querySelector('[data-del]').onclick=async()=>{if(!confirm('متأكد؟ سيُحذف الحساب وكل بياناته من الخادم (يبقى التقدّم على هذا الجهاز فقط).'))return;try{await accCall('delete',{},true);ACC.token='';ACC.user=null;ov.remove();renderAccBtn();toast('تم حذف الحساب')}catch(e){toast(e.message)}}}
 
