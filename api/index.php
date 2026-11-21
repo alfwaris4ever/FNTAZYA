@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, email TEXT UNIQUE NOT N
     CREATE INDEX IF NOT EXISTS ev_user ON events(user_id);
     CREATE INDEX IF NOT EXISTS ev_game ON events(game);
 SQL);
+  $cols = array_column($pdo->query('PRAGMA table_info(users)')->fetchAll(), 'name');
+  if (!in_array('suspended', $cols, true)) $pdo->exec('ALTER TABLE users ADD COLUMN suspended INTEGER DEFAULT 0');
   return $pdo;
 }
 
@@ -152,6 +154,7 @@ function authUser(): array {
   $st->execute([hash('sha256', $t)]);
   $u = $st->fetch();
   if (!$u) fail('سجّل دخولك من جديد', 401);
+  if (!empty($u['suspended'])) fail('هذا الحساب موقوف. تواصل مع إدارة فنتازيا', 403);
   db()->prepare('UPDATE users SET last_seen=? WHERE id=?')->execute([time(), $u['id']]);
   return $u;
 }
@@ -209,6 +212,7 @@ try {
       $email = cleanEmail($b['email'] ?? ''); $pin = cleanPin($b['pin'] ?? '');
       checkLimit($email);
       $st = db()->prepare('SELECT * FROM users WHERE email=?'); $st->execute([$email]); $u = $st->fetch();
+      if ($u && !empty($u['suspended'])) fail('هذا الحساب موقوف. تواصل مع إدارة فنتازيا', 403);
       if (!$u || !password_verify($pin, $u['pin_hash'])) {
         db()->prepare('INSERT INTO attempts(email,ip,ts) VALUES(?,?,?)')->execute([$email, ip(), time()]);
         fail($u ? 'الرمز غير صحيح' : 'ما لقينا حساباً بهذا البريد. اختر «حساب جديد»');
@@ -295,11 +299,39 @@ try {
         'topGames' => $q("SELECT game, COUNT(*) n, SUM(ok) wins FROM events WHERE kind IN ('stage','lose') GROUP BY game ORDER BY n DESC LIMIT 15"),
         'topCats' => $q("SELECT cat, COUNT(*) n FROM events WHERE kind IN ('stage','lose') GROUP BY cat ORDER BY n DESC LIMIT 12"),
         'players' => $q(<<<'SQL'
-SELECT u.name, u.avatar, CASE WHEN u.marketing=1 THEN u.email ELSE substr(u.email,1,2)||'•••@'||substr(u.email,instr(u.email,'@')+1) END email, u.marketing, u.created, u.last_seen,
+SELECT u.id, u.suspended, u.name, u.avatar, u.email, u.marketing, u.created, u.last_seen,
                           (SELECT COUNT(*) FROM events e WHERE e.user_id=u.id) plays,
                           (SELECT e.cat FROM events e WHERE e.user_id=u.id AND e.cat<>'' GROUP BY e.cat ORDER BY COUNT(*) DESC LIMIT 1) favcat
                          FROM users u ORDER BY u.last_seen DESC LIMIT 300
 SQL)]);
+    }
+
+    case 'admin_user': {
+      $me = authUser();
+      if (!in_array($me['email'], ADMIN_EMAILS, true)) fail('غير مصرّح', 403);
+      $id = (int)($b['id'] ?? 0); $op = (string)($b['op'] ?? '');
+      $st = db()->prepare('SELECT * FROM users WHERE id=?'); $st->execute([$id]); $t = $st->fetch();
+      if (!$t) fail('العضو غير موجود', 404);
+      $self = (int)$t['id'] === (int)$me['id'];
+      if ($op === 'name') { db()->prepare('UPDATE users SET name=? WHERE id=?')->execute([cleanName($b['value'] ?? ''), $id]); }
+      elseif ($op === 'email') {
+        if ($self) fail('لا يمكن تغيير بريد حساب الإدارة من هنا');
+        $e = cleanEmail($b['value'] ?? '');
+        $ex = db()->prepare('SELECT id FROM users WHERE email=? AND id<>?'); $ex->execute([$e, $id]);
+        if ($ex->fetch()) fail('هذا البريد مستخدم في حساب آخر');
+        db()->prepare('UPDATE users SET email=? WHERE id=?')->execute([$e, $id]);
+      }
+      elseif ($op === 'suspend' || $op === 'unsuspend') {
+        if ($self) fail('لا يمكن إيقاف حساب الإدارة');
+        db()->prepare('UPDATE users SET suspended=? WHERE id=?')->execute([$op === 'suspend' ? 1 : 0, $id]);
+        if ($op === 'suspend') db()->prepare('DELETE FROM tokens WHERE user_id=?')->execute([$id]);
+      }
+      elseif ($op === 'delete') {
+        if ($self) fail('لا يمكن حذف حساب الإدارة الذي تستخدمه الآن');
+        foreach (['DELETE FROM events WHERE user_id=?', 'DELETE FROM tokens WHERE user_id=?', 'DELETE FROM users WHERE id=?'] as $qq) db()->prepare($qq)->execute([$id]);
+      }
+      else fail('عملية غير معروفة');
+      out(['ok' => true]);
     }
 
     case 'unsub': {
