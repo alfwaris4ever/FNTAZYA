@@ -19,6 +19,7 @@ th,td{padding:8px 10px;text-align:right;border-bottom:1px solid #eef1ff}th{backg
 .bar{height:8px;border-radius:99px;background:linear-gradient(90deg,#5b3cff,#ec4899)}
 .msg{background:#fff;border-radius:16px;padding:24px;text-align:center;font-weight:700}
 button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:8px 14px;background:#5b3cff;color:#fff;cursor:pointer}
+button.sm{padding:4px 7px;margin:0 2px;background:#eef1ff;color:#1d2350;font-size:14px}button.sm:hover{background:#dfe4ff}button.sm.del:hover{background:#fee2e2}
 </style>
 </head>
 <body>
@@ -36,9 +37,16 @@ async function load(){
   <div class="cols"><div><h2>🎮 الألعاب الأكثر لعباً</h2><table><tr><th>اللعبة</th><th>جولات</th><th>فوز كامل</th><th></th></tr>${j.topGames.map(g=>`<tr><td>${esc(g.game)}</td><td>${g.n}</td><td>${g.wins||0}</td><td style="width:35%"><div class="bar" style="width:${g.n/max*100}%"></div></td></tr>`).join('')||'<tr><td colspan=4>لا بيانات بعد</td></tr>'}</table></div>
   <div><h2>📂 التصنيفات الأكثر لعباً</h2><table><tr><th>التصنيف</th><th>جولات</th></tr>${j.topCats.map(c=>`<tr><td>${esc(c.cat)}</td><td>${c.n}</td></tr>`).join('')||'<tr><td colspan=2>لا بيانات بعد</td></tr>'}</table></div></div>
   <h2 style="margin-top:18px">👥 اللاعبون (آخر نشاط أولاً) <button id="csv">⬇ تصدير بريد الموافقين CSV</button></h2>
-  <p style="color:#64748b;font-size:13px">يظهر البريد كاملاً فقط لمن وافق ولي أمره على استلام جديد الألعاب.</p>
-  <table><tr><th></th><th>الاسم</th><th>البريد</th><th>يستلم الجديد</th><th>التصنيف المفضّل</th><th>جولات</th><th>التسجيل</th><th>آخر نشاط</th></tr>
-  ${j.players.map(p=>`<tr><td>${esc(p.avatar)}</td><td>${esc(p.name)}</td><td dir="ltr">${esc(p.email)}</td><td>${p.marketing?'✅':'—'}</td><td>${esc(p.favcat||'')}</td><td>${p.plays}</td><td>${day(p.created)}</td><td>${day(p.last_seen)}</td></tr>`).join('')}</table>`;
+  <p style="color:#64748b;font-size:13px">التصدير يشمل فقط من وافق ولي أمره على استلام جديد الألعاب. الأزرار: ✏️ الاسم · 📧 البريد · ⛔ إيقاف/▶️ تفعيل · 🗑️ حذف.</p>
+  <table><tr><th></th><th>الاسم</th><th>البريد</th><th>الحالة</th><th>يستلم الجديد</th><th>التصنيف المفضّل</th><th>جولات</th><th>التسجيل</th><th>آخر نشاط</th><th>تحكم</th></tr>
+  ${j.players.map(p=>`<tr${p.suspended?' style="opacity:.55"':''}><td>${esc(p.avatar)}</td><td>${esc(p.name)}</td><td dir="ltr">${esc(p.email)}</td><td>${p.suspended?'⛔ موقوف':'✅ نشط'}</td><td>${p.marketing?'✅':'—'}</td><td>${esc(p.favcat||'')}</td><td>${p.plays}</td><td>${day(p.created)}</td><td>${day(p.last_seen)}</td><td class="act" style="white-space:nowrap"><button class="sm" data-op="name" data-id="${p.id}" title="تغيير الاسم">✏️</button><button class="sm" data-op="email" data-id="${p.id}" title="تغيير البريد">📧</button><button class="sm" data-op="${p.suspended?'unsuspend':'suspend'}" data-id="${p.id}" title="${p.suspended?'تفعيل':'إيقاف'}">${p.suspended?'▶️':'⛔'}</button><button class="sm del" data-op="delete" data-id="${p.id}" title="حذف">🗑️</button></td></tr>`).join('')}</table>`;
+  app.querySelectorAll('[data-op]').forEach(b=>b.onclick=async()=>{const p=j.players.find(x=>x.id==b.dataset.id),op=b.dataset.op;let value;
+    if(op==='name'){value=prompt('الاسم الجديد لـ '+p.name,p.name);if(value==null)return}
+    else if(op==='email'){value=prompt('البريد الجديد لـ '+p.name,p.email);if(value==null)return}
+    else if(op==='delete'){if(!confirm('حذف العضو «'+p.name+'» ('+p.email+') وكل بياناته نهائياً؟'))return}
+    else if(op==='suspend'){if(!confirm('إيقاف العضو «'+p.name+'»؟ لن يستطيع الدخول حتى تفعّله.'))return}
+    const r=await fetch('api/index.php?a=admin_user',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({id:p.id,op,value})});const k=await r.json().catch(()=>({ok:false,error:'الخادم لا يستجيب'}));
+    if(!k.ok)return alert(k.error);load()});
   document.getElementById('csv').onclick=()=>{const rows=[['name','email','favorite_category','plays','joined'],...j.players.filter(p=>p.marketing).map(p=>[p.name,p.email,p.favcat||'',p.plays,day(p.created)])];
     const csv='\ufeff'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='fntazya-players.csv';a.click()}}
 function loginForm(note=''){app.innerHTML=`<div class="msg" style="max-width:380px;margin:20px auto;text-align:right">
