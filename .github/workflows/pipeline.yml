@@ -98,7 +98,7 @@ jobs:
             **/.git*/**
             .github/**
             scripts/**
-            README.md
+            **/*.md
 
   verify-live:
     name: Verify live site
