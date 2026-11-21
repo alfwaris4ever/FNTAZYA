@@ -784,3 +784,39 @@ a{color:inherit;text-decoration:none}
 .sub-row .sub-tile.on{outline:4px solid #fff;outline-offset:-4px;box-shadow:0 0 0 4px var(--c1),var(--shadow);filter:none;opacity:1}
 .sub-row .sub-tile.on::after{content:"✔ أنت هنا";position:absolute;top:8px;inset-inline-end:10px;background:#fff;color:#1d2350;font-size:11px;font-weight:800;border-radius:99px;padding:2px 8px;box-shadow:0 2px 0 rgba(0,0,0,.12)}
 .mark-img{object-fit:cover;padding:0;background:none!important;transform:rotate(-6deg);box-shadow:0 4px 10px rgba(91,60,255,.35)}
+
+/* ===== حساب اللاعب (اختياري) ===== */
+.acc-btn.in{background:linear-gradient(135deg,#fde68a,#f9a8d4);font-size:20px}
+.rec-badge{background:linear-gradient(90deg,#facc15,#f472b6)!important;color:#1d2350!important}
+.acc-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 auto 14px;max-width:1200px;padding:10px 14px;border-radius:16px;background:linear-gradient(90deg,#ede9fe,#fce7f3);box-shadow:var(--shadow);font-weight:700;font-size:14px}
+.acc-banner span{flex:1;min-width:200px}
+.acc-banner button{font:inherit;font-weight:800;border:0;border-radius:99px;padding:6px 14px;cursor:pointer}
+.acc-b-go{background:linear-gradient(#a78bfa,#6d28d9);color:#fff}.acc-b-x{background:rgba(255,255,255,.7)}
+.acc-ov{position:fixed;inset:0;z-index:300;display:grid;place-items:center;padding:14px;background:rgba(20,22,60,.55);backdrop-filter:blur(6px);animation:fade .2s}
+.acc-card{position:relative;width:min(100%,520px);max-height:calc(100dvh - 28px);overflow:auto;background:#fff;border-radius:26px;padding:22px 20px 18px;box-shadow:0 20px 50px rgba(0,0,0,.35);animation:pop .3s cubic-bezier(.3,1.5,.5,1);text-align:center}
+.acc-x{position:absolute;top:10px;inset-inline-start:10px;width:34px;height:34px;border:0;border-radius:50%;background:#eef1ff;font-size:16px;cursor:pointer}
+.acc-hero{font-size:64px;line-height:1;animation:bob 2s ease-in-out infinite}
+.acc-card h2{margin:6px 0}.acc-card p{color:#555b85;font-weight:600;line-height:1.7;margin:6px 0 12px}
+.acc-perks{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:14px}.acc-perks span{background:#eef1ff;border-radius:99px;padding:3px 10px;font-weight:700;font-size:13px}
+.acc-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:6px}.acc-btns.small .play-btn{font-size:16px;padding:6px 16px}
+.acc-note{display:block;color:#8a90b8;font-size:12px;line-height:1.6;margin-top:10px}
+.acc-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#eef1ff;border-radius:16px;padding:4px;margin:18px 0 12px}
+.acc-tabs button{font:inherit;font-weight:800;border:0;border-radius:12px;padding:8px;background:none;cursor:pointer;color:#555b85}.acc-tabs button.on{background:#fff;color:#5b3cff;box-shadow:0 3px 8px rgba(0,0,0,.08)}
+.acc-form{display:flex;flex-direction:column;gap:10px;text-align:right}
+.acc-form label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:14px}
+.acc-form input:not([type=checkbox]){font:inherit;font-size:17px;padding:10px 12px;border-radius:12px;border:2px solid #e2e6ff;outline:none}.acc-form input:focus{border-color:#5b3cff}
+.acc-form input.pin{letter-spacing:12px;text-align:center;font-size:24px;font-weight:800}
+.acc-form .chk{flex-direction:row;align-items:center;gap:8px;font-weight:600;font-size:13px}
+.acc-lbl{font-weight:700;font-size:14px}
+.av-pick{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.av{width:42px;height:42px;border:0;border-radius:12px;background:#f1f5f9;font-size:24px;cursor:pointer}.av.on{background:#ede9fe;box-shadow:0 0 0 3px #7c3aed}
+.acc-err{min-height:1.2em;color:#dc2626;font-weight:700;font-size:13px}.acc-err.good{color:#16a34a}
+.acc-submit{width:100%}.acc-submit:disabled{opacity:.6}
+.acc-link{font:inherit;border:0;background:none;color:#5b3cff;font-weight:700;cursor:pointer;text-decoration:underline;font-size:13px}.acc-link.danger{color:#dc2626;margin-top:10px}
+.acc-me{display:flex;align-items:center;gap:12px;text-align:right;margin-top:8px}.acc-av{font-size:46px;width:70px;height:70px;display:grid;place-items:center;border-radius:20px;background:linear-gradient(135deg,#fde68a,#f9a8d4)}.acc-me h2{margin:0}.acc-me small{color:#8a90b8}
+.acc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.acc-stats div{background:#eef1ff;border-radius:14px;padding:8px 4px}.acc-stats b{display:block;font-size:20px;color:#5b3cff}.acc-stats span{font-size:11px;font-weight:700;color:#555b85}
+@media(max-width:420px){.acc-stats{grid-template-columns:repeat(2,1fr)}}
+.acc-card h3{text-align:right;font-size:16px;margin:12px 0 6px}
+.acc-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.acc-g{flex:none;width:84px;text-align:center;font-size:11px;font-weight:700;color:#1d2350}.acc-g img{width:84px;height:84px;border-radius:16px;object-fit:cover;display:block;margin-bottom:3px;box-shadow:0 4px 10px rgba(0,0,0,.15)}
+.acc-bars{display:flex;flex-direction:column;gap:6px;text-align:right}.acc-bars div{display:grid;grid-template-columns:130px 1fr;align-items:center;gap:8px;font-size:13px;font-weight:700}
+.acc-bars i{display:block;height:10px;border-radius:99px;width:var(--w);min-width:8px;background:linear-gradient(90deg,var(--c1),var(--c2))}
