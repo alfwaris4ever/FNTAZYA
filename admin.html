@@ -26,11 +26,11 @@ button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:8px 14px
 <main id="app"><div class="msg">جاري التحميل…</div></main>
 <script>
 const app=document.getElementById('app'),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const token=localStorage.getItem('fz:token');const day=t=>t?new Date(t*1000).toLocaleDateString('ar-SA-u-nu-latn'):'';
+let token=localStorage.getItem('fz:token');const day=t=>t?new Date(t*1000).toLocaleDateString('ar-SA-u-nu-latn'):'';
 async function load(){
-  if(!token){app.innerHTML='<div class="msg">سجّل دخولك في الموقع بحساب الإدارة أولاً (زر 👤 في الصفحة الرئيسية).</div>';return}
+  if(!token)return loginForm();
   const r=await fetch('api/index.php?a=admin',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:'{}'});const j=await r.json().catch(()=>({ok:false,error:'الخادم لا يستجيب'}));
-  if(!j.ok){app.innerHTML=`<div class="msg">${esc(j.error)}</div>`;return}
+  if(!j.ok){if(r.status===401||r.status===403)return loginForm(r.status===403?'هذا الحساب ليس حساب الإدارة. ادخل ببريد الإدارة.':'انتهت الجلسة، ادخل من جديد.');app.innerHTML=`<div class="msg">${esc(j.error)}</div>`;return}
   const max=Math.max(1,...j.topGames.map(g=>g.n));
   app.innerHTML=`<div class="cards"><div class="card"><b>${j.users}</b><span>لاعب مسجّل</span></div><div class="card"><b>${j.new7}</b><span>جديد خلال 7 أيام</span></div><div class="card"><b>${j.active7}</b><span>نشط خلال 7 أيام</span></div><div class="card"><b>${j.marketing}</b><span>وافقوا على رسائل الجديد</span></div><div class="card"><b>${j.events}</b><span>جولة لعب مسجّلة</span></div></div>
   <div class="cols"><div><h2>🎮 الألعاب الأكثر لعباً</h2><table><tr><th>اللعبة</th><th>جولات</th><th>فوز كامل</th><th></th></tr>${j.topGames.map(g=>`<tr><td>${esc(g.game)}</td><td>${g.n}</td><td>${g.wins||0}</td><td style="width:35%"><div class="bar" style="width:${g.n/max*100}%"></div></td></tr>`).join('')||'<tr><td colspan=4>لا بيانات بعد</td></tr>'}</table></div>
@@ -41,6 +41,18 @@ async function load(){
   ${j.players.map(p=>`<tr><td>${esc(p.avatar)}</td><td>${esc(p.name)}</td><td dir="ltr">${esc(p.email)}</td><td>${p.marketing?'✅':'—'}</td><td>${esc(p.favcat||'')}</td><td>${p.plays}</td><td>${day(p.created)}</td><td>${day(p.last_seen)}</td></tr>`).join('')}</table>`;
   document.getElementById('csv').onclick=()=>{const rows=[['name','email','favorite_category','plays','joined'],...j.players.filter(p=>p.marketing).map(p=>[p.name,p.email,p.favcat||'',p.plays,day(p.created)])];
     const csv='\ufeff'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='fntazya-players.csv';a.click()}}
+function loginForm(note=''){app.innerHTML=`<div class="msg" style="max-width:380px;margin:20px auto;text-align:right">
+  <h2 style="margin-top:0">🔐 دخول الإدارة</h2>${note?`<p style="color:#dc2626">${esc(note)}</p>`:''}
+  <p style="color:#64748b;font-weight:400;font-size:13px">ادخل ببريد الإدارة والرمز المكوّن من 4 أرقام. إذا ما عندك حساب بعد، اختر «إنشاء حساب الإدارة».</p>
+  <label>البريد<br><input id="em" type="email" dir="ltr" value="alfwaris4ever@gmail.com" style="width:100%;padding:10px;border-radius:10px;border:2px solid #e2e6ff;font:inherit;margin:4px 0 10px"></label>
+  <label>الرمز (4 أرقام)<br><input id="pn" inputmode="numeric" maxlength="4" dir="ltr" style="width:100%;padding:10px;border-radius:10px;border:2px solid #e2e6ff;font:inherit;font-size:22px;letter-spacing:10px;text-align:center;margin:4px 0 10px"></label>
+  <div id="er" style="color:#dc2626;min-height:1.3em;font-size:13px"></div>
+  <button id="li" style="width:100%;margin-bottom:8px">دخول</button><button id="rg" style="width:100%;background:#16a34a">إنشاء حساب الإدارة (أول مرة)</button></div>`;
+  const go=async a=>{const email=document.getElementById('em').value.trim(),pin=document.getElementById('pn').value.trim(),er=document.getElementById('er');er.textContent='';
+    if(!/^\d{4}$/.test(pin))return er.textContent='الرمز لازم يكون 4 أرقام';
+    const r=await fetch('api/index.php?a='+a,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,pin,name:'الإدارة',avatar:'👑'})});const j=await r.json().catch(()=>({ok:false,error:'الخادم لا يستجيب'}));
+    if(!j.ok)return er.textContent=j.error;token=j.token;localStorage.setItem('fz:token',j.token);localStorage.setItem('fz:user',JSON.stringify(j.user));load()};
+  document.getElementById('li').onclick=()=>go('login');document.getElementById('rg').onclick=()=>go('register')}
 load();
 </script>
 </body>
