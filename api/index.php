@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, email TEXT UNIQUE NOT N
     CREATE TABLE IF NOT EXISTS resets(email TEXT, ts INTEGER);
     CREATE INDEX IF NOT EXISTS ev_user ON events(user_id);
     CREATE INDEX IF NOT EXISTS ev_game ON events(game);
+CREATE TABLE IF NOT EXISTS ad_requests(id INTEGER PRIMARY KEY, ts INTEGER, ip TEXT, name TEXT, company TEXT, email TEXT, phone TEXT, package TEXT, message TEXT);
 SQL);
   $cols = array_column($pdo->query('PRAGMA table_info(users)')->fetchAll(), 'name');
   if (!in_array('suspended', $cols, true)) $pdo->exec('ALTER TABLE users ADD COLUMN suspended INTEGER DEFAULT 0');
@@ -297,6 +298,7 @@ try {
         'marketing' => (int)$one('SELECT COUNT(*) FROM users WHERE marketing=1'),
         'events' => (int)$one('SELECT COUNT(*) FROM events'),
         'topGames' => $q("SELECT game, COUNT(*) n, SUM(ok) wins FROM events WHERE kind IN ('stage','lose') GROUP BY game ORDER BY n DESC LIMIT 15"),
+        'adRequests' => $q('SELECT id, ts, name, company, email, phone, package, message FROM ad_requests ORDER BY ts DESC LIMIT 100'),
         'topCats' => $q("SELECT cat, COUNT(*) n FROM events WHERE kind IN ('stage','lose') GROUP BY cat ORDER BY n DESC LIMIT 12"),
         'players' => $q(<<<'SQL'
 SELECT u.id, u.suspended, u.name, u.avatar, u.email, u.marketing, u.created, u.last_seen,
@@ -331,6 +333,28 @@ SQL)]);
         foreach (['DELETE FROM events WHERE user_id=?', 'DELETE FROM tokens WHERE user_id=?', 'DELETE FROM users WHERE id=?'] as $qq) db()->prepare($qq)->execute([$id]);
       }
       else fail('عملية غير معروفة');
+      out(['ok' => true]);
+    }
+
+    case 'advertise': {
+      if (!empty($b['website'])) out(['ok' => true]); // فخ للبوتات
+      $name = mb_substr(trim(strip_tags((string)($b['name'] ?? ''))), 0, 80);
+      $company = mb_substr(trim(strip_tags((string)($b['company'] ?? ''))), 0, 100);
+      $email = cleanEmail($b['email'] ?? '');
+      if ($name === '' || $company === '') fail('اكتب الاسم والشركة');
+      $c = db()->prepare('SELECT COUNT(*) FROM ad_requests WHERE ip=? AND ts>?'); $c->execute([ip(), time() - 3600]);
+      if ($c->fetchColumn() >= 5) fail('أرسلت طلبات كثيرة، جرّب بعد ساعة', 429);
+      $phone = mb_substr(preg_replace('/[^\d+ ]/', '', (string)($b['phone'] ?? '')), 0, 30);
+      $pkg = mb_substr(trim(strip_tags((string)($b['package'] ?? ''))), 0, 60);
+      $msg = mb_substr(trim(strip_tags((string)($b['message'] ?? ''))), 0, 2000);
+      db()->prepare('INSERT INTO ad_requests(ts,ip,name,company,email,phone,package,message) VALUES(?,?,?,?,?,?,?,?)')->execute([time(), ip(), $name, $company, $email, $phone, $pkg, $msg]);
+      try {
+        $rows = '<table role="presentation" cellpadding="6" style="font-size:15px;line-height:1.8">'
+          . '<tr><td><b>الاسم</b></td><td>' . h($name) . '</td></tr><tr><td><b>الشركة</b></td><td>' . h($company) . '</td></tr>'
+          . '<tr><td><b>البريد</b></td><td dir="ltr">' . h($email) . '</td></tr><tr><td><b>الجوال</b></td><td dir="ltr">' . h($phone) . '</td></tr>'
+          . '<tr><td><b>الباقة</b></td><td>' . h($pkg) . '</td></tr><tr><td valign="top"><b>التفاصيل</b></td><td>' . nl2br(h($msg)) . '</td></tr></table>';
+        foreach (ADMIN_EMAILS as $to) sendMail($to, 'طلب إعلان جديد: ' . $company, 'طلب إعلان جديد 📢', $rows, "طلب إعلان من $name ($company) - $email - $phone\n$pkg\n$msg");
+      } catch (Throwable $e) { error_log('advertise mail: ' . $e->getMessage()); }
       out(['ok' => true]);
     }
 
