@@ -20,6 +20,18 @@ th,td{padding:8px 10px;text-align:right;border-bottom:1px solid #eef1ff}th{backg
 .msg{background:#fff;border-radius:16px;padding:24px;text-align:center;font-weight:700}
 button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:8px 14px;background:#5b3cff;color:#fff;cursor:pointer}
 button.sm{padding:4px 7px;margin:0 2px;background:#eef1ff;color:#1d2350;font-size:14px}button.sm:hover{background:#dfe4ff}button.sm.del:hover{background:#fee2e2}
+.tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}.tabs a{padding:8px 18px;border-radius:99px;background:#fff;color:#1d2350;font-weight:700;text-decoration:none;box-shadow:0 2px 8px rgba(29,35,80,.08)}.tabs a.on{background:#5b3cff;color:#fff}
+.toolbar{margin-bottom:12px;font-weight:700}button.sm.on{background:#5b3cff;color:#fff}
+.chart{background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(29,35,80,.08)}.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:700}.legend span[style*="--c"]::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--c);margin-inline-end:5px;vertical-align:-1px}
+.note{color:#64748b;font-size:13px;line-height:1.8}.chip{display:inline-block;background:#eef1ff;border-radius:99px;padding:1px 8px;font-size:12px;margin:1px}.sub{color:#64748b;font-size:12px}
+img.thumb{width:64px;height:32px;object-fit:cover;border-radius:6px;vertical-align:middle}
+textarea{width:100%;font:13px/1.6 monospace;padding:8px;border-radius:10px;border:2px solid #e2e6ff;box-sizing:border-box}
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto;z-index:50}
+.modal-card{background:#fff;border-radius:18px;padding:20px;width:min(760px,100%)}
+.frm{display:grid;grid-template-columns:1fr 1fr;gap:12px}.frm .full{grid-column:1/-1}@media(max-width:640px){.frm{grid-template-columns:1fr}}
+.frm label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:14px}.frm label.ck{flex-direction:row;align-items:center;gap:6px;font-weight:600;display:inline-flex;margin:3px 10px 3px 0}
+.frm input:not([type=checkbox]),.frm select{font:inherit;padding:8px 10px;border-radius:10px;border:2px solid #e2e6ff}
+.frm fieldset{border:2px solid #eef1ff;border-radius:12px}.frm [hidden]{display:none!important}#prev img{max-width:100%;max-height:140px;margin-top:6px;border-radius:8px}
 </style>
 </head>
 <body>
@@ -30,10 +42,11 @@ const app=document.getElementById('app'),esc=s=>String(s??'').replace(/[&<>"']/g
 let token=localStorage.getItem('fz:token');const day=t=>t?new Date(t*1000).toLocaleDateString('ar-SA-u-nu-latn'):'';
 async function load(){
   if(!token)return loginForm();
+  if(location.hash==='#traffic')return loadTraffic();if(location.hash==='#ads')return loadAds();
   const r=await fetch('api/index.php?a=admin',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:'{}'});const j=await r.json().catch(()=>({ok:false,error:'الخادم لا يستجيب'}));
   if(!j.ok){if(r.status===401||r.status===403)return loginForm(r.status===403?'هذا الحساب ليس حساب الإدارة. ادخل ببريد الإدارة.':'انتهت الجلسة، ادخل من جديد.');app.innerHTML=`<div class="msg">${esc(j.error)}</div>`;return}
   const max=Math.max(1,...j.topGames.map(g=>g.n));
-  app.innerHTML=`<div class="cards"><div class="card"><b>${j.users}</b><span>لاعب مسجّل</span></div><div class="card"><b>${j.new7}</b><span>جديد خلال 7 أيام</span></div><div class="card"><b>${j.active7}</b><span>نشط خلال 7 أيام</span></div><div class="card"><b>${j.marketing}</b><span>وافقوا على رسائل الجديد</span></div><div class="card"><b>${j.events}</b><span>جولة لعب مسجّلة</span></div></div>
+  app.innerHTML=tabsBar('')+`<div class="cards"><div class="card"><b>${j.users}</b><span>لاعب مسجّل</span></div><div class="card"><b>${j.new7}</b><span>جديد خلال 7 أيام</span></div><div class="card"><b>${j.active7}</b><span>نشط خلال 7 أيام</span></div><div class="card"><b>${j.marketing}</b><span>وافقوا على رسائل الجديد</span></div><div class="card"><b>${j.events}</b><span>جولة لعب مسجّلة</span></div></div>
   <div class="cols"><div><h2>🎮 الألعاب الأكثر لعباً</h2><table><tr><th>اللعبة</th><th>جولات</th><th>فوز كامل</th><th></th></tr>${j.topGames.map(g=>`<tr><td>${esc(g.game)}</td><td>${g.n}</td><td>${g.wins||0}</td><td style="width:35%"><div class="bar" style="width:${g.n/max*100}%"></div></td></tr>`).join('')||'<tr><td colspan=4>لا بيانات بعد</td></tr>'}</table></div>
   <div><h2>📂 التصنيفات الأكثر لعباً</h2><table><tr><th>التصنيف</th><th>جولات</th></tr>${j.topCats.map(c=>`<tr><td>${esc(c.cat)}</td><td>${c.n}</td></tr>`).join('')||'<tr><td colspan=2>لا بيانات بعد</td></tr>'}</table></div></div>
   <h2 style="margin-top:18px">📢 طلبات الإعلان (${(j.adRequests||[]).length})</h2><table><tr><th>التاريخ</th><th>الشركة</th><th>الاسم</th><th>البريد</th><th>الجوال</th><th>الباقة</th><th>التفاصيل</th></tr>${(j.adRequests||[]).map(a=>`<tr><td>${day(a.ts)}</td><td>${esc(a.company)}</td><td>${esc(a.name)}</td><td dir="ltr"><a href="mailto:${esc(a.email)}">${esc(a.email)}</a></td><td dir="ltr">${esc(a.phone)}</td><td>${esc(a.package)}</td><td style="max-width:280px">${esc(a.message)}</td></tr>`).join('')||'<tr><td colspan=7>لا توجد طلبات بعد</td></tr>'}</table>
@@ -62,7 +75,8 @@ function loginForm(note=''){app.innerHTML=`<div class="msg" style="max-width:380
     const r=await fetch('api/index.php?a='+a,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,pin,name:'الإدارة',avatar:'👑'})});const j=await r.json().catch(()=>({ok:false,error:'الخادم لا يستجيب'}));
     if(!j.ok)return er.textContent=j.error;token=j.token;localStorage.setItem('fz:token',j.token);localStorage.setItem('fz:user',JSON.stringify(j.user));load()};
   document.getElementById('li').onclick=()=>go('login');document.getElementById('rg').onclick=()=>go('register')}
-load();
 </script>
+<script src="js/admin-ads.js?v=20261122b"></script>
+<script>addEventListener('hashchange',load);load()</script>
 </body>
 </html>

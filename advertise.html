@@ -48,6 +48,7 @@ footer{text-align:center;color:#64748b;font-weight:600;padding:10px 16px 30px}
   <section class="card">
     <h2>📊 فنتازيا بالأرقام</h2>
     <div class="stats">
+      <div class="stat" id="vis" hidden><b>—</b><span>زائر خلال 30 يوماً</span></div>
       <div class="stat"><b>+75</b><span>لعبة عربية</span></div>
       <div class="stat"><b>12</b><span>تصنيفاً: تعليم، ذكاء، حركة…</span></div>
       <div class="stat"><b>3–12</b><span>عمر الأطفال</span></div>
@@ -67,7 +68,7 @@ footer{text-align:center;color:#64748b;font-weight:600;padding:10px 16px 30px}
   <section class="card">
     <h2>📦 الباقات الإعلانية</h2>
     <div class="pk">
-      <div class="p"><h3>🖼️ بانر</h3><ul><li>بانر عريض في الصفحة الرئيسية</li><li>أو تحت منطقة اللعب</li><li>أسبوعي أو شهري</li></ul></div>
+      <div class="p"><h3>🖼️ بانر</h3><ul><li>بانر عريض في الصفحة الرئيسية</li><li>أو تحت منطقة اللعب</li><li>أسبوعي أو شهري، أو بعدد مشاهدات محدد</li><li>استهداف تصنيف معيّن (تعليمية، ذكاء، سيارات…)</li></ul></div>
       <div class="p hot"><span class="tag">الأكثر تأثيراً</span><h3>🎮 لعبة برعايتك</h3><ul><li>لعبة تحمل اسم منتجك أو شخصيته</li><li>شعارك في شاشة البداية والنهاية</li><li>تبقى في الموقع طوال مدة العقد</li></ul></div>
       <div class="p"><h3>🌙 حملة موسمية</h3><ul><li>رمضان، العيد، اليوم الوطني، العودة للمدارس</li><li>رعاية قسم كامل أو الصفحة الرئيسية</li></ul></div>
       <div class="p"><h3>📬 رعاية النشرة</h3><ul><li>ظهور في رسائل «جديد الألعاب» لأولياء الأمور الموافقين</li></ul></div>
@@ -79,7 +80,9 @@ footer{text-align:center;color:#64748b;font-weight:600;padding:10px 16px 30px}
       <li>منتجات وخدمات مناسبة للأطفال والعائلات فقط.</li>
       <li>لا إعلانات للأطعمة غير الصحية الموجّهة للطفل مباشرة، ولا للمنتجات المقيّدة بالعمر.</li>
       <li>لا تتبّع شخصي للأطفال ولا جمع لبياناتهم عبر الإعلانات.</li>
-      <li>كل إعلان يحمل كلمة «إعلان» بوضوح، ونحتفظ بحق رفض أي إعلان.</li>
+      <li>كل إعلان يحمل كلمة «إعلان» بوضوح، والخروج من الموقع عبر الإعلان يمر ببوابة الأهل.</li>
+      <li>المعلن يستلم رابط تقرير مباشر يعرض المشاهدات الفعلية والنقرات يومياً (المشاهدة = ظهور 50% من الإعلان لمدة ثانية، معيار IAB).</li>
+      <li>نحتفظ بحق رفض أي إعلان.</li>
     </ul>
   </section>
   <section class="card" id="contact">
@@ -99,6 +102,7 @@ footer{text-align:center;color:#64748b;font-weight:600;padding:10px 16px 30px}
 </main>
 <footer>© فنتازيا 2026 · <a href="./">العودة للألعاب</a></footer>
 <script>
+fetch('api/index.php?a=pubstats').then(r=>r.json()).then(j=>{if(j.ok&&j.visitors30>=500){const v=document.getElementById('vis');v.querySelector('b').textContent='+'+j.visitors30.toLocaleString('en-US');v.hidden=false}}).catch(()=>{});
 const f=document.getElementById('f'),m=document.getElementById('msg');
 f.onsubmit=async e=>{e.preventDefault();m.className='';const d=Object.fromEntries(new FormData(f));
   if(!d.name.trim()||!d.company.trim()||!/^\S+@\S+\.\S+$/.test(d.email)){m.className='err';m.textContent='اكتب الاسم والشركة وبريداً صحيحاً';return}
