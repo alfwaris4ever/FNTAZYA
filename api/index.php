@@ -188,6 +188,8 @@ function checkLimit(string $email): void {
 
 try {
   $a = $_GET['a'] ?? '';
+  // الإعلانات والإحصاءات في ملف مستقل
+  if (in_array($a, ['ads', 'adev', 'adclick', 'hit', 'pubstats', 'report', 'adm_traffic', 'adm_ads', 'adm_ad_save', 'adm_ad_del', 'adm_slot_save', 'adm_adstxt'], true)) require __DIR__ . '/adserver.php';
   if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $a !== 'ping' && $a !== 'unsub') fail('طلب غير صالح', 405);
   $b = body();
 
