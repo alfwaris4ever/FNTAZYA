@@ -841,8 +841,14 @@ a{color:inherit;text-decoration:none}
 .fz-sp-box .fz-sp-house{flex-direction:column;text-align:center;padding:18px 14px}.fz-sp-box .fz-sp-house .fz-sp-t{align-items:center}
 @media(max-width:520px){.fz-sp-house .fz-sp-cta{display:none}.fz-sp-house b{font-size:16px}}
 .fz-sp.fz-sp-mini{margin-top:12px;min-height:0;box-shadow:none;background:transparent}
-.fz-sp-img{display:block}.fz-sp-img img{display:block;width:100%;height:auto;max-height:250px;object-fit:contain;background:#fff}
-.fz-sp-wide .fz-sp-img img{max-height:120px;object-fit:cover}.fz-sp-box .fz-sp-img img{object-fit:cover;aspect-ratio:6/5;max-height:none}
+/* إعلانات الصور: الصورة تظهر بمقاسها الحقيقي بلا قص ولا فراغ، ولكل جهاز صورته */
+.fz-sp.has-img{min-height:0;background:transparent;box-shadow:none;border-radius:0;overflow:visible;display:flex;justify-content:center}
+.fz-sp-img{display:block;width:100%;line-height:0;position:relative}.fz-sp-img picture{display:block}
+.fz-sp-img img{display:block;width:100%;height:auto;border-radius:14px;box-shadow:var(--shadow)}
+.fz-sp.has-img .fz-sp-tag{top:5px;inset-inline-start:6px;line-height:1.5}
+.fz-sp-wide.has-img .fz-sp-img{max-width:970px}.fz-sp-box.has-img .fz-sp-img{max-width:336px}.fz-sp-mini.has-img .fz-sp-img{max-width:400px}
+@media(max-width:1023px){.fz-sp-box.has-img:not(.no-t) .fz-sp-img{max-width:728px}}
+@media(max-width:600px){.fz-sp-box.has-img .fz-sp-img{max-width:336px}.fz-sp-wide.has-img:not(.no-m) .fz-sp-img{max-width:400px}}
 .fz-sp-net{display:flex;justify-content:center;background:#fff}.fz-sp-frame{display:block;width:100%;border:0;background:transparent}
 .fz-sp-box .fz-sp-frame{max-width:300px}.fz-sp-wide .fz-sp-frame{max-width:970px}
 .pgate{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
