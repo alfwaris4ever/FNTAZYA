@@ -829,22 +829,22 @@ a{color:inherit;text-decoration:none}
 .acc-mk{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 4px;font-weight:700;font-size:13px;color:#555b85;cursor:pointer}
 
 /* ===== المساحات الإعلانية ===== */
-.grid>.ad-slot{grid-column:1/-1}
-.ad-slot{position:relative;border-radius:var(--r,18px);overflow:hidden;background:#fff;box-shadow:var(--shadow);margin:0}
-.ad-slot.ad-wide{min-height:76px}.ad-slot.ad-box{margin-bottom:14px}
-#view-game .ad-slot.ad-wide{margin-top:14px}
-.ad-label{position:absolute;top:6px;inset-inline-start:8px;z-index:2;font-size:10px;font-weight:800;color:#64748b;background:rgba(241,245,249,.95);padding:0 7px;border-radius:99px;letter-spacing:.5px}
-.ad-slot img{display:block;width:100%;height:auto}
-.ad-house{display:flex;align-items:center;gap:14px;padding:14px 18px;text-decoration:none;color:#1d2350;background:linear-gradient(90deg,#fef9c3,#fce7f3 55%,#ede9fe);min-height:76px}
-.ad-house .ad-e{font-size:36px}.ad-house .ad-t{flex:1;display:flex;flex-direction:column;line-height:1.35}.ad-house b{font-size:18px}.ad-house small{color:#555b85;font-weight:600}
-.ad-house .ad-cta{font-weight:800;color:#5b3cff;white-space:nowrap}
-.ad-box .ad-house{flex-direction:column;text-align:center;padding:18px 14px}.ad-box .ad-house .ad-t{align-items:center}
-@media(max-width:520px){.ad-house .ad-cta{display:none}.ad-house b{font-size:16px}}
-.ad-slot.ad-mini{margin-top:12px;min-height:0;box-shadow:none;background:transparent}
-.ad-img{display:block}.ad-img img{display:block;width:100%;height:auto;max-height:250px;object-fit:contain;background:#fff}
-.ad-wide .ad-img img{max-height:120px;object-fit:cover}.ad-box .ad-img img{object-fit:cover;aspect-ratio:6/5;max-height:none}
-.ad-net{display:flex;justify-content:center;background:#fff}.ad-frame{display:block;width:100%;border:0;background:transparent}
-.ad-box .ad-frame{max-width:300px}.ad-wide .ad-frame{max-width:970px}
+.grid>.fz-sp{grid-column:1/-1}
+.fz-sp{position:relative;border-radius:var(--r,18px);overflow:hidden;background:#fff;box-shadow:var(--shadow);margin:0}
+.fz-sp.fz-sp-wide{min-height:76px}.fz-sp.fz-sp-box{margin-bottom:14px}
+#view-game .fz-sp.fz-sp-wide{margin-top:14px}
+.fz-sp-tag{position:absolute;top:6px;inset-inline-start:8px;z-index:2;font-size:10px;font-weight:800;color:#64748b;background:rgba(241,245,249,.95);padding:0 7px;border-radius:99px;letter-spacing:.5px}
+.fz-sp img{display:block;width:100%;height:auto}
+.fz-sp-house{display:flex;align-items:center;gap:14px;padding:14px 18px;text-decoration:none;color:#1d2350;background:linear-gradient(90deg,#fef9c3,#fce7f3 55%,#ede9fe);min-height:76px}
+.fz-sp-house .fz-sp-e{font-size:36px}.fz-sp-house .fz-sp-t{flex:1;display:flex;flex-direction:column;line-height:1.35}.fz-sp-house b{font-size:18px}.fz-sp-house small{color:#555b85;font-weight:600}
+.fz-sp-house .fz-sp-cta{font-weight:800;color:#5b3cff;white-space:nowrap}
+.fz-sp-box .fz-sp-house{flex-direction:column;text-align:center;padding:18px 14px}.fz-sp-box .fz-sp-house .fz-sp-t{align-items:center}
+@media(max-width:520px){.fz-sp-house .fz-sp-cta{display:none}.fz-sp-house b{font-size:16px}}
+.fz-sp.fz-sp-mini{margin-top:12px;min-height:0;box-shadow:none;background:transparent}
+.fz-sp-img{display:block}.fz-sp-img img{display:block;width:100%;height:auto;max-height:250px;object-fit:contain;background:#fff}
+.fz-sp-wide .fz-sp-img img{max-height:120px;object-fit:cover}.fz-sp-box .fz-sp-img img{object-fit:cover;aspect-ratio:6/5;max-height:none}
+.fz-sp-net{display:flex;justify-content:center;background:#fff}.fz-sp-frame{display:block;width:100%;border:0;background:transparent}
+.fz-sp-box .fz-sp-frame{max-width:300px}.fz-sp-wide .fz-sp-frame{max-width:970px}
 .pgate{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
 .pgate-card{background:#fff;border-radius:24px;padding:22px 20px;width:min(360px,100%);text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .pgate-e{font-size:44px}.pgate-card h3{margin:6px 0 2px;font-size:20px}.pgate-card p{margin:0 0 10px;color:#555b85;font-weight:600}
