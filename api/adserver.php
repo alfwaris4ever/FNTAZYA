@@ -3,11 +3,12 @@
    يُستدعى من index.php، ويستخدم دواله: db() out() fail() authUser() body() ip() secretKey() h().
    الإحصاءات: الزائر الفريد = بصمة يومية مشفّرة (اليوم + مفتاح سري + IP + المتصفح) تُحذف بعد يومين، ولا يُحفظ IP ولا أي معرّف دائم. */
 
+/* لكل مساحة مقاس صورة لكل جهاز: d كمبيوتر (1024px فأكثر)، t تابلت (601-1023px)، m جوال (600px فأقل) */
 const AD_SLOTS = [
-  'home_top'   => ['t' => 'الرئيسية: شريط عريض أعلى الألعاب', 'size' => '970×90 / 728×90 (عريض)'],
-  'game_below' => ['t' => 'صفحة اللعبة: تحت منطقة اللعب', 'size' => '970×90 / 728×90 (عريض)'],
-  'game_side'  => ['t' => 'صفحة اللعبة: مربع جانبي', 'size' => '300×250 (مربع)'],
-  'between'    => ['t' => 'بين المراحل: داخل بطاقة النتيجة', 'size' => '320×100 (صغير)'],
+  'home_top'   => ['t' => 'الرئيسية: شريط عريض أعلى الألعاب', 'size' => 'كمبيوتر 970×90 · تابلت 728×90 · جوال 320×100', 'dev' => ['d' => [970, 90], 't' => [728, 90], 'm' => [320, 100]]],
+  'game_below' => ['t' => 'صفحة اللعبة: تحت منطقة اللعب', 'size' => 'كمبيوتر 970×90 · تابلت 728×90 · جوال 320×100', 'dev' => ['d' => [970, 90], 't' => [728, 90], 'm' => [320, 100]]],
+  'game_side'  => ['t' => 'صفحة اللعبة: مربع جانبي', 'size' => 'كمبيوتر 300×250 · تابلت 728×90 · جوال 300×250', 'dev' => ['d' => [300, 250], 't' => [728, 90], 'm' => [300, 250]]],
+  'between'    => ['t' => 'بين المراحل: داخل بطاقة النتيجة', 'size' => 'كل الأجهزة 320×100', 'dev' => ['d' => [320, 100]]],
 ];
 
 function adSchema(): void {
@@ -20,6 +21,28 @@ CREATE TABLE IF NOT EXISTS ad_campaigns(id INTEGER PRIMARY KEY, name TEXT, adver
 CREATE TABLE IF NOT EXISTS ad_stats(day TEXT, cid INTEGER, slot TEXT, impr INTEGER DEFAULT 0, clicks INTEGER DEFAULT 0, PRIMARY KEY(day,cid,slot));
 CREATE TABLE IF NOT EXISTS ad_slots(slot TEXT PRIMARY KEY, mode TEXT DEFAULT 'house', html TEXT DEFAULT '');
 SQL);
+  $cols = array_column(db()->query('PRAGMA table_info(ad_campaigns)')->fetchAll(), 'name');
+  if (!in_array('creatives', $cols, true)) db()->exec("ALTER TABLE ad_campaigns ADD COLUMN creatives TEXT DEFAULT ''");
+}
+/* صور الحملة لكل مساحة ولكل جهاز: {slot:{d:url,t:url,m:url}} */
+function creativesOf(array $c): array {
+  $cr = json_decode((string)($c['creatives'] ?? ''), true);
+  return is_array($cr) ? $cr : [];
+}
+function saveUpload(string $data): string {
+  if (!preg_match('#^data:image/(png|jpe?g|webp|gif);base64,(.+)$#', $data, $m)) fail('صيغة الصورة غير مدعومة (PNG أو JPG أو WEBP أو GIF)');
+  $bin = base64_decode($m[2], true);
+  if (!$bin || strlen($bin) > 1500000) fail('حجم الصورة كبير، الحد 1.5 ميغا');
+  if (!@getimagesizefromstring($bin)) fail('الملف ليس صورة صالحة');
+  $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__)), '/'); $dir = "$root/ads-media";
+  if (!is_dir($dir)) @mkdir($dir, 0755, true);
+  $name = bin2hex(random_bytes(10)) . '.' . ($m[1] === 'jpeg' ? 'jpg' : $m[1]);
+  if (!@file_put_contents("$dir/$name", $bin)) fail('تعذّر حفظ الصورة على الخادم', 500);
+  return "/ads-media/$name";
+}
+function cleanImg($u): string {
+  $u = (string)$u;
+  return preg_match('#^/ads-media/[\w.-]+$#', $u) ? $u : cleanUrl($u);
 }
 function today(): string { return gmdate('Y-m-d', time() + 3 * 3600); } // توقيت السعودية
 function anInc(string $k, string $v, int $by = 1): void {
@@ -70,7 +93,9 @@ switch ($a) {
       }
       if ($pool) {
         $c = $pool[random_int(0, count($pool) - 1)];
-        $outS[$slot] = ['type' => $c['kind'] === 'html' ? 'html' : 'image', 'cid' => (int)$c['id'], 'img' => $c['img'], 'html' => $c['kind'] === 'html' ? $c['html'] : '',
+        $cr = creativesOf($c)[$slot] ?? [];
+        $outS[$slot] = ['type' => $c['kind'] === 'html' ? 'html' : 'image', 'cid' => (int)$c['id'], 'img' => ($cr['d'] ?? '') ?: ($cr['t'] ?? '') ?: ($cr['m'] ?? '') ?: $c['img'],
+          'img_t' => $cr['t'] ?? '', 'img_m' => $cr['m'] ?? '', 'html' => $c['kind'] === 'html' ? $c['html'] : '',
           'alt' => $c['alt'] ?: $c['advertiser'], 'click' => $c['link'] ? 'api/index.php?a=adclick&c=' . (int)$c['id'] . '&s=' . $slot : ''];
       } else {
         $s = $settings[$slot] ?? ['mode' => $slot === 'between' ? 'off' : 'house', 'html' => ''];
@@ -166,28 +191,29 @@ switch ($a) {
     $slots = implode(',', array_values(array_intersect((array)($b['slots'] ?? []), array_keys(AD_SLOTS))));
     if ($slots === '') fail('اختر مساحة إعلانية واحدة على الأقل');
     $kind = ($b['kind'] ?? '') === 'html' ? 'html' : 'image';
-    $img = cleanUrl($b['img'] ?? '') ?: (preg_match('#^/ads-media/[\w.-]+$#', (string)($b['img'] ?? '')) ? (string)$b['img'] : '');
-    if (!empty($b['upload'])) {
-      if (!preg_match('#^data:image/(png|jpe?g|webp|gif);base64,(.+)$#', (string)$b['upload'], $m)) fail('صيغة الصورة غير مدعومة (PNG أو JPG أو WEBP أو GIF)');
-      $bin = base64_decode($m[2], true);
-      if (!$bin || strlen($bin) > 1500000) fail('حجم الصورة كبير، الحد 1.5 ميغا');
-      if (!@getimagesizefromstring($bin)) fail('الملف ليس صورة صالحة');
-      $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__)), '/'); $dir = "$root/ads-media";
-      if (!is_dir($dir)) @mkdir($dir, 0755, true);
-      $name = bin2hex(random_bytes(10)) . '.' . ($m[1] === 'jpeg' ? 'jpg' : $m[1]);
-      if (!@file_put_contents("$dir/$name", $bin)) fail('تعذّر حفظ الصورة على الخادم', 500);
-      $img = "/ads-media/$name";
+    $creatives = []; $img = '';
+    if ($kind === 'image') {
+      $in = is_array($b['creatives'] ?? null) ? $b['creatives'] : [];
+      foreach (explode(',', $slots) as $s) {
+        foreach (array_keys(AD_SLOTS[$s]['dev']) as $dv) {
+          $v = $in[$s][$dv] ?? '';
+          $u = is_string($v) && strncmp($v, 'data:image/', 11) === 0 ? saveUpload($v) : cleanImg($v);
+          if ($u !== '') $creatives[$s][$dv] = $u;
+        }
+        if (empty($creatives[$s])) fail('أضف صورة واحدة على الأقل لمساحة: ' . AD_SLOTS[$s]['t']);
+        if (!$img) $img = $creatives[$s]['d'] ?? reset($creatives[$s]);
+      }
     }
-    if ($kind === 'image' && !$img) fail('أضف صورة الإعلان (رفع أو رابط)');
     $html = $kind === 'html' ? mb_substr((string)($b['html'] ?? ''), 0, 20000) : '';
     if ($kind === 'html' && trim($html) === '') fail('ألصق كود الإعلان');
     $dt = fn($x) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$x) ? (string)$x : '';
     $vals = [mb_substr(trim((string)($b['name'] ?? '')), 0, 100) ?: 'حملة بدون اسم', mb_substr(trim((string)($b['advertiser'] ?? '')), 0, 100), $slots,
       implode(',', array_filter(array_map(fn($x) => preg_replace('/[^\w-]/', '', (string)$x), (array)($b['cats'] ?? [])))),
       $kind, $img, $html, cleanUrl($b['link'] ?? ''), mb_substr((string)($b['alt'] ?? ''), 0, 150), $dt($b['start'] ?? ''), $dt($b['end'] ?? ''),
-      max(1, min(10, (int)($b['weight'] ?? 1))), max(0, (int)($b['max_impr'] ?? 0)), ($b['status'] ?? 'active') === 'paused' ? 'paused' : 'active'];
-    if ($id) { $vals[] = $id; db()->prepare('UPDATE ad_campaigns SET name=?,advertiser=?,slots=?,cats=?,kind=?,img=?,html=?,link=?,alt=?,start=?,end=?,weight=?,max_impr=?,status=? WHERE id=?')->execute($vals); }
-    else { $vals[] = bin2hex(random_bytes(16)); $vals[] = time(); db()->prepare('INSERT INTO ad_campaigns(name,advertiser,slots,cats,kind,img,html,link,alt,start,end,weight,max_impr,status,report_token,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($vals); }
+      max(1, min(10, (int)($b['weight'] ?? 1))), max(0, (int)($b['max_impr'] ?? 0)), ($b['status'] ?? 'active') === 'paused' ? 'paused' : 'active',
+      $creatives ? json_encode($creatives, JSON_UNESCAPED_SLASHES) : ''];
+    if ($id) { $vals[] = $id; db()->prepare('UPDATE ad_campaigns SET name=?,advertiser=?,slots=?,cats=?,kind=?,img=?,html=?,link=?,alt=?,start=?,end=?,weight=?,max_impr=?,status=?,creatives=? WHERE id=?')->execute($vals); }
+    else { $vals[] = bin2hex(random_bytes(16)); $vals[] = time(); db()->prepare('INSERT INTO ad_campaigns(name,advertiser,slots,cats,kind,img,html,link,alt,start,end,weight,max_impr,status,creatives,report_token,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($vals); }
     out(['ok' => true]);
   }
 
