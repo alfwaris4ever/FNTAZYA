@@ -56,7 +56,7 @@ async function loadAds() {
    <div class="card"><b>${fmt(ti)}</b><span>مشاهدة فعلية</span></div><div class="card"><b>${fmt(tc)}</b><span>نقرة</span></div><div class="card"><b>${ctr(ti, tc)}</b><span>نسبة النقر CTR</span></div></div>
   <h2>🎯 حملات الرعاة المباشرين <button id="newC">➕ حملة جديدة</button></h2>
   <table><tr><th>الحملة</th><th>المعلن</th><th>المساحات</th><th>الفترة</th><th>الحالة</th><th>مشاهدات</th><th>نقرات</th><th>CTR</th><th>تحكم</th></tr>
-  ${j.campaigns.map((c) => `<tr><td>${c.kind === 'image' && c.img ? `<img src="${esc(c.img)}" class="thumb" alt="">` : '🧩'} <b>${esc(c.name)}</b></td><td>${esc(c.advertiser)}</td>
+  ${j.campaigns.map((c) => `<tr><td>${c.kind === 'image' && c.img ? `<img src="${esc(c.img)}" class="thumb" alt="">` : '🧩'} <b>${esc(c.name)}</b>${c.kind === 'image' ? `<div class="sub">${Object.entries(crOf(c)).map(([s, v]) => Object.keys(v).map((k) => ({ d: '💻', t: '📱', m: '📲' }[k])).join('')).join(' · ')}</div>` : ''}</td><td>${esc(c.advertiser)}</td>
     <td>${c.slots.split(',').map((s) => `<span class="chip">${esc(slotName[s] || s)}</span>`).join(' ')}${c.cats ? `<div class="sub">${c.cats.split(',').map((x) => ADM_CATS[x] || x).join('، ')}</div>` : ''}</td>
     <td class="sub">${c.start || 'فوراً'} ← ${c.end || 'مفتوحة'}${+c.max_impr ? `<br>حد ${fmt(c.max_impr)} مشاهدة` : ''}</td>
     <td>${c.status === 'paused' ? '⏸️ موقوفة' : c.live ? '🟢 تعمل' : '⚪ خارج الفترة/مكتملة'}</td><td>${fmt(c.impr)}</td><td>${fmt(c.clicks)}</td><td>${ctr(c.impr, c.clicks)}</td>
@@ -73,7 +73,7 @@ async function loadAds() {
   app.querySelector('#newC').onclick = () => campaignForm();
   app.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => campaignForm(j.campaigns.find((c) => c.id == b.dataset.edit))));
   app.querySelectorAll('[data-toggle]').forEach((b) => (b.onclick = async () => { const c = j.campaigns.find((x) => x.id == b.dataset.toggle);
-    await admApi('adm_ad_save', { ...c, slots: c.slots.split(','), cats: c.cats ? c.cats.split(',') : [], status: c.status === 'paused' ? 'active' : 'paused' }).catch((e) => alert(e.message)); loadAds(); }));
+    await admApi('adm_ad_save', { ...c, creatives: crOf(c), slots: c.slots.split(','), cats: c.cats ? c.cats.split(',') : [], status: c.status === 'paused' ? 'active' : 'paused' }).catch((e) => alert(e.message)); loadAds(); }));
   app.querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => { if (!confirm('حذف الحملة وكل إحصاءاتها نهائياً؟')) return; await admApi('adm_ad_del', { id: +b.dataset.del }).catch((e) => alert(e.message)); loadAds(); }));
   app.querySelectorAll('[data-rep]').forEach((b) => (b.onclick = async () => { const u = location.origin + '/ad-report.html?t=' + b.dataset.rep; try { await navigator.clipboard.writeText(u); b.textContent = '✅'; } catch (e) { prompt('رابط تقرير المعلن:', u); } }));
   app.querySelectorAll('[data-slot]').forEach((b) => (b.onclick = () => slotForm(j.slots.find((s) => s.slot === b.dataset.slot))));
@@ -84,35 +84,61 @@ function modal(html) {
   d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('[data-close]')) d.remove(); });
   document.body.appendChild(d); return d;
 }
+const DEV_NAMES = { d: '💻 كمبيوتر', t: '📱 تابلت', m: '📲 جوال' };
+function crOf(c) { // صور الحملة الحالية لكل مساحة وجهاز
+  let cr = {}; try { cr = JSON.parse(c.creatives || '{}') || {}; } catch (e) {}
+  for (const s of (c.slots || '').split(',').filter(Boolean)) if (!cr[s] && c.img) cr[s] = { d: c.img };
+  return cr;
+}
 function campaignForm(c = {}) {
-  const slots = (c.slots || '').split(','), cats = (c.cats || '').split(',');
+  const slots = (c.slots || '').split(','), cats = (c.cats || '').split(','), cur = crOf(c), pend = {};
   const d = modal(`<h2>${c.id ? '✏️ تعديل حملة' : '➕ حملة جديدة'}</h2><form id="cf" class="frm">
     <label>اسم الحملة<input name="name" value="${esc(c.name)}" placeholder="مثال: عروض العودة للمدارس"></label>
     <label>المعلن<input name="advertiser" value="${esc(c.advertiser)}" placeholder="اسم الشركة"></label>
-    <fieldset class="full"><legend>المساحات</legend>${ADM_ADS.slots.map((s) => `<label class="ck"><input type="checkbox" name="slots" value="${s.slot}"${slots.includes(s.slot) ? ' checked' : ''}> ${esc(s.t)} <small dir="ltr">${esc(s.size)}</small></label>`).join('')}</fieldset>
+    <fieldset class="full"><legend>المساحات</legend>${ADM_ADS.slots.map((s) => `<label class="ck"><input type="checkbox" name="slots" value="${s.slot}"${slots.includes(s.slot) ? ' checked' : ''}> ${esc(s.t)}</label>`).join('')}</fieldset>
     <fieldset class="full"><legend>استهداف التصنيفات (اتركها فارغة = كل الموقع)</legend>${Object.entries(ADM_CATS).map(([k, v]) => `<label class="ck"><input type="checkbox" name="cats" value="${k}"${cats.includes(k) ? ' checked' : ''}> ${v}</label>`).join('')}</fieldset>
-    <label>نوع الإعلان<select name="kind"><option value="image"${c.kind !== 'html' ? ' selected' : ''}>صورة بانر + رابط</option><option value="html"${c.kind === 'html' ? ' selected' : ''}>كود HTML من المعلن</option></select></label>
+    <label>نوع الإعلان<select name="kind"><option value="image"${c.kind !== 'html' ? ' selected' : ''}>صور بانر + رابط</option><option value="html"${c.kind === 'html' ? ' selected' : ''}>كود HTML من المعلن</option></select></label>
     <label>الأولوية (1-10)<input name="weight" type="number" min="1" max="10" value="${c.weight || 1}"></label>
-    <div class="full k-image"><label>صورة البانر (ارفع ملفاً أو ضع رابطاً)<input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
-      <input name="img" dir="ltr" value="${esc(c.img)}" placeholder="https://..."><div id="prev">${c.img ? `<img src="${esc(c.img)}" alt="">` : ''}</div></div>
+    <div class="full k-image" id="crs"></div>
     <label class="full k-image">رابط المعلن (يفتح بعد بوابة الأهل)<input name="link" dir="ltr" value="${esc(c.link)}" placeholder="https://"></label>
-    <label class="full k-image">نص بديل للصورة<input name="alt" value="${esc(c.alt)}"></label>
+    <label class="full k-image">نص بديل للصور<input name="alt" value="${esc(c.alt)}"></label>
     <label class="full k-html">كود الإعلان (يعمل داخل إطار معزول)<textarea name="html" dir="ltr" rows="5">${esc(c.html)}</textarea></label>
     <label>تاريخ البداية<input type="date" name="start" value="${esc(c.start)}"></label><label>تاريخ النهاية<input type="date" name="end" value="${esc(c.end)}"></label>
     <label>حد المشاهدات (0 = بلا حد)<input type="number" name="max_impr" min="0" value="${c.max_impr || 0}"></label>
     <label>الحالة<select name="status"><option value="active">🟢 تعمل</option><option value="paused"${c.status === 'paused' ? ' selected' : ''}>⏸️ موقوفة</option></select></label>
     <div class="full" id="cerr" style="color:#dc2626;font-weight:700"></div>
     <div class="full"><button type="submit">💾 حفظ الحملة</button> <button type="button" class="sm" data-close>إلغاء</button></div></form>`);
-  const f = d.querySelector('#cf'), sync = () => { const h = f.kind.value === 'html'; d.querySelectorAll('.k-image').forEach((x) => (x.hidden = h)); d.querySelectorAll('.k-html').forEach((x) => (x.hidden = !h)); };
+  const f = d.querySelector('#cf'), crs = d.querySelector('#crs');
+  const val = (s, dv) => pend[s]?.[dv] ?? cur[s]?.[dv] ?? '';
+  const check = (tile, w, h) => { // يقارن مقاس الصورة بالمقاس المطلوب
+    const img = tile.querySelector('img'), info = tile.querySelector('.cr-info'); if (!img) { info.textContent = 'لا توجد صورة'; info.className = 'cr-info'; return; }
+    const go = () => { const rw = img.naturalWidth, rh = img.naturalHeight; if (!rw) return;
+      const ok = Math.abs(rw / rh - w / h) / (w / h) < 0.08, big = rw >= w;
+      info.textContent = `${rw}×${rh} · ${ok ? (big ? '✅ مقاس مناسب' : '⚠️ النسبة صحيحة لكن الدقة منخفضة') : '⚠️ النسبة لا تطابق ' + w + '×' + h + ' وستظهر بشكل مختلف'}`;
+      info.className = 'cr-info ' + (ok && big ? 'ok' : 'warn'); };
+    img.complete ? go() : (img.onload = go);
+  };
+  const drawCr = () => {
+    const sel = [...f.querySelectorAll('[name=slots]:checked')].map((x) => x.value);
+    crs.innerHTML = sel.length ? '<h3 style="margin:4px 0">🖼️ صور الإعلان لكل مساحة ولكل جهاز</h3><p class="note" style="margin:0 0 8px">ارفع صورة بالمقاس المكتوب لكل جهاز. إذا لم ترفع صورة التابلت أو الجوال تُستخدم صورة الكمبيوتر (وقد تظهر صغيرة).</p>' + sel.map((s) => { const S = ADM_ADS.slots.find((x) => x.slot === s);
+      return `<div class="cr-slot"><b>${esc(S.t)}</b><div class="cr-row">${Object.entries(S.dev).map(([dv, [w, h]]) => { const v = val(s, dv);
+        return `<div class="cr-tile" data-s="${s}" data-d="${dv}" data-w="${w}" data-h="${h}"><div class="cr-h">${Object.keys(S.dev).length === 1 ? '🖥️📱 كل الأجهزة' : DEV_NAMES[dv]} <span dir="ltr">${w}×${h}</span></div>
+          <div class="cr-prev" style="aspect-ratio:${w}/${h}">${v ? `<img src="${esc(v)}" alt="">` : '<span>اختر صورة</span>'}</div><div class="cr-info"></div>
+          <div class="cr-act"><label class="sm-btn">📁 رفع<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>${v ? '<button type="button" class="sm del" data-rm>🗑️</button>' : ''}</div></div>`; }).join('')}</div></div>`; }).join('') : '<p class="note">اختر المساحات أولاً لتظهر خانات الصور.</p>';
+    crs.querySelectorAll('.cr-tile').forEach((t) => { const { s, d: dv, w, h } = t.dataset; check(t, +w, +h);
+      t.querySelector('input[type=file]').onchange = (e) => { const fl = e.target.files[0]; if (!fl) return; if (fl.size > 1500000) { d.querySelector('#cerr').textContent = 'الحد الأقصى للصورة 1.5 ميغا'; return; }
+        const r = new FileReader(); r.onload = () => { (pend[s] ||= {})[dv] = r.result; drawCr(); }; r.readAsDataURL(fl); };
+      t.querySelector('[data-rm]')?.addEventListener('click', () => { (pend[s] ||= {})[dv] = ''; drawCr(); }); });
+  };
+  f.querySelectorAll('[name=slots]').forEach((x) => (x.onchange = drawCr)); drawCr();
+  const sync = () => { const h = f.kind.value === 'html'; d.querySelectorAll('.k-image').forEach((x) => (x.hidden = h)); d.querySelectorAll('.k-html').forEach((x) => (x.hidden = !h)); };
   f.kind.onchange = sync; sync();
-  let upload = '';
-  f.file.onchange = () => { const fl = f.file.files[0]; if (!fl) return; if (fl.size > 1500000) { d.querySelector('#cerr').textContent = 'الحد الأقصى 1.5 ميغا'; return; }
-    const r = new FileReader(); r.onload = () => { upload = r.result; d.querySelector('#prev').innerHTML = `<img src="${upload}" alt="">`; }; r.readAsDataURL(fl); };
-  f.onsubmit = async (e) => { e.preventDefault(); const fd = new FormData(f);
-    const body = { id: c.id || 0, name: fd.get('name'), advertiser: fd.get('advertiser'), slots: fd.getAll('slots'), cats: fd.getAll('cats'), kind: fd.get('kind'), weight: +fd.get('weight'),
-      img: fd.get('img'), upload, link: fd.get('link'), alt: fd.get('alt'), html: fd.get('html'), start: fd.get('start'), end: fd.get('end'), max_impr: +fd.get('max_impr'), status: fd.get('status') };
-    const btn = f.querySelector('[type=submit]'); btn.disabled = true;
-    try { await admApi('adm_ad_save', body); d.remove(); loadAds(); } catch (er) { d.querySelector('#cerr').textContent = er.message; btn.disabled = false; } };
+  f.onsubmit = async (e) => { e.preventDefault(); const fd = new FormData(f), sel = fd.getAll('slots'), creatives = {};
+    for (const s of sel) { const S = ADM_ADS.slots.find((x) => x.slot === s); creatives[s] = {}; for (const dv of Object.keys(S.dev)) creatives[s][dv] = val(s, dv); }
+    const body = { id: c.id || 0, name: fd.get('name'), advertiser: fd.get('advertiser'), slots: sel, cats: fd.getAll('cats'), kind: fd.get('kind'), weight: +fd.get('weight'),
+      creatives, link: fd.get('link'), alt: fd.get('alt'), html: fd.get('html'), start: fd.get('start'), end: fd.get('end'), max_impr: +fd.get('max_impr'), status: fd.get('status') };
+    const btn = f.querySelector('[type=submit]'); btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…';
+    try { await admApi('adm_ad_save', body); d.remove(); loadAds(); } catch (er) { d.querySelector('#cerr').textContent = er.message; btn.disabled = false; btn.textContent = '💾 حفظ الحملة'; } };
 }
 function slotForm(s) {
   const d = modal(`<h2>⚙️ ${esc(s.t)}</h2><p class="note">المقاس المقترح: <span dir="ltr">${esc(s.size)}</span>. الحملات المباشرة لها الأولوية دائماً، وهذا الإعداد يعمل عند عدم وجودها.</p>

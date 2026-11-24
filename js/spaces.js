@@ -87,7 +87,11 @@
     el.innerHTML = '<span class="fz-sp-tag">إعلان</span>';
     if (ad.type === 'image' && ad.img) {
       el.dataset.cid = ad.cid;
-      el.insertAdjacentHTML('beforeend', `<a class="fz-sp-img" href="${esc(ad.click || '#')}" rel="sponsored noopener nofollow"><img src="${esc(ad.img)}" alt="${esc(ad.alt || 'إعلان')}" decoding="async"></a>`);
+      // صورة لكل جهاز: جوال (600px فأقل)، تابلت (حتى 1023px)، كمبيوتر
+      el.classList.add('has-img'); if (!ad.img_t) el.classList.add('no-t'); if (!ad.img_m) el.classList.add('no-m');
+      const src = (u, mq) => (u ? `<source media="${mq}" srcset="${esc(u)}">` : '');
+      el.insertAdjacentHTML('beforeend', `<a class="fz-sp-img" href="${esc(ad.click || '#')}" rel="sponsored noopener nofollow"><picture>${src(ad.img_m, '(max-width:600px)')}${src(ad.img_t, '(max-width:1023px)')}<img src="${esc(ad.img)}" alt="${esc(ad.alt || 'إعلان')}" decoding="async"></picture></a>`);
+      el.querySelector('.fz-sp-img').prepend(el.querySelector('.fz-sp-tag'));
       el.querySelector('a').addEventListener('click', (e) => { e.preventDefault(); if (!ad.click) return; let u = ad.click; try { u = new URL(ad.click, location.href).href; } catch (er) {} parentGate(u); });
       io?.observe(el);
     } else if ((ad.type === 'html' || ad.type === 'network') && ad.html) {
