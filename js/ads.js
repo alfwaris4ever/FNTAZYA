@@ -120,7 +120,9 @@
   let results = +sessionStorage.getItem('fz:results') || 0;
   async function onResult(ov, g) {
     sessionStorage.setItem('fz:results', ++results);
-    if (!ov || !ov.querySelector || results % BETWEEN_EVERY) return;
+    if (results % BETWEEN_EVERY) return;
+    if (!ov || !ov.querySelector) { const all = document.querySelectorAll('#stage .result-ov'); ov = all[all.length - 1]; }
+    if (!ov) return;
     const s = await fetchSlots(['between'], g?.cat);
     if (!ov.isConnected) return;
     const btns = ov.querySelector('.ov-btns'); if (btns) place('between', s.between, btns);
@@ -129,5 +131,6 @@
   const sh = showHome; window.showHome = function (cat) { const r = sh.apply(this, arguments); try { onHome(cat); } catch (e) {} return r; };
   const og = openGame; window.openGame = function (g) { const r = og.apply(this, arguments); try { onGame(g); } catch (e) {} return r; };
   const sd = stageDone; window.stageDone = function (g) { const r = sd.apply(this, arguments); try { onResult(r, g); } catch (e) {} return r; };
+  const go = gameOver; window.gameOver = function (g) { const r = go.apply(this, arguments); try { onResult(r, g); } catch (e) {} return r; };
   try { route(); } catch (e) {}
 })();
