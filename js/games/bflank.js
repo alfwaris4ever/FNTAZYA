@@ -3,7 +3,7 @@
 const fbPick=a=>a[Math.floor(Math.random()*a.length)];
 const FB_ROT=[0,180,-90,90];
 const fbBird=(k,s)=>`<svg viewBox="-50 -50 100 100" width="${s}" height="${s}" style="position:absolute;left:0;top:0;transform:translate(-50%,-50%) rotate(${FB_ROT[k]}deg);overflow:visible;filter:drop-shadow(0 4px 3px rgba(0,0,0,.25))"><path d="M-30 0 L-46 -14 L-40 0 L-46 14 Z" fill="#1d4ed8"/><path d="M4 -8 C-6 -30 -24 -44 -34 -40 C-26 -28 -18 -16 -12 -6 Z M4 8 C-6 30 -24 44 -34 40 C-26 28 -18 16 -12 6 Z" fill="#2563eb"/><ellipse cx="-6" cy="0" rx="28" ry="14" fill="#3b82f6"/><circle cx="20" cy="0" r="14" fill="#60a5fa"/><path d="M31 -7 L50 0 L31 7 Z" fill="#f97316"/><circle cx="24" cy="-6" r="3.4" fill="#fff"/><circle cx="25" cy="-6" r="1.8" fill="#0f172a"/><circle cx="24" cy="6" r="3.4" fill="#fff"/><circle cx="25" cy="6" r="1.8" fill="#0f172a"/></svg>`;
-const FB_FORMS=[[[-2,0],[-1,0],[1,0],[2,0]],[[0,-2],[0,-1],[0,1],[0,2]],[[-1,0],[1,0],[0,-1],[0,1]],[[-1,-1],[1,-1],[-1,1],[1,1]],[[-1,-1],[-2,-2],[1,-1],[2,-2]],[[-1,1],[-2,2],[1,1],[2,2]]];
+const FB_FORMS=[[[-2,0],[-1,0],[1,0],[2,0]],[[0,-2],[0,-1],[0,1],[0,2]],[[-1,0],[1,0],[0,-1],[0,1]],[[-1,-1],[1,-1],[-1,1],[1,1]]];/* بلا شكل V: رأس الـV ليس «منتصفاً» واضحاً للطفل */
 const FB_BIG=[[[-2,0],[-1,0],[1,0],[2,0],[0,-1],[0,1],[0,-2],[0,2]],[[-1,-1],[1,-1],[-1,1],[1,1],[-2,0],[2,0],[0,-2],[0,2]],[[-1,0],[-2,0],[1,0],[2,0],[-1,-1],[1,-1],[-1,1],[1,1]]];
 G.bflank=(root,c)=>{const tier=c.lv<10?0:c.lv<20?1:2;brainRounds(root,c,{total:c.fi(8,18),label:'إجابات صحيحة',round(area,i,done,api){
   const d=rnd(0,3),same=Math.random()<.4,fd=same?d:fbPick([0,1,2,3].filter(x=>x!==d)),rev=tier===2&&Math.random()<.35,ans=rev?[1,0,3,2][d]:d,tl=[c.f(5.5,3.5),c.f(4,2.6),c.f(3.6,2.2)][tier];
