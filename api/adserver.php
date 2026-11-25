@@ -48,11 +48,15 @@ SQL);
   if ($firstFiller) db()->exec("UPDATE ad_campaigns SET ctype='filler', advertiser='فنتازيا (رديف)', weight=1, max_impr=0, start='', end='' WHERE advertiser LIKE 'تجريبي%'");
 }
 function creativesOf(array $c): array { $cr = json_decode((string)($c['creatives'] ?? ''), true); return is_array($cr) ? $cr : []; }
-function saveUpload(string $data): string {
+/* $need = [عرض, ارتفاع] المطلوب: يُرفض أي فرق أكثر من 5 بكسل، وتُرفض صور CMYK */
+function saveUpload(string $data, array $need = [], string $label = ''): string {
   if (!preg_match('#^data:image/(png|jpe?g|webp|gif);base64,(.+)$#', $data, $m)) fail('صيغة الصورة غير مدعومة (PNG أو JPG أو WEBP أو GIF)');
   $bin = base64_decode($m[2], true);
   if (!$bin || strlen($bin) > 1500000) fail('حجم الصورة كبير، الحد 1.5 ميغا');
-  if (!@getimagesizefromstring($bin)) fail('الملف ليس صورة صالحة');
+  $gi = @getimagesizefromstring($bin);
+  if (!$gi) fail('الملف ليس صورة صالحة');
+  if (($gi[2] ?? 0) === IMAGETYPE_JPEG && (int)($gi['channels'] ?? 3) === 4) fail('الصورة بألوان CMYK (للطباعة). احفظها بألوان RGB ثم ارفعها' . ($label ? ": $label" : ''));
+  if ($need && (abs($gi[0] - $need[0]) > 5 || abs($gi[1] - $need[1]) > 5)) fail("مقاس الصورة {$gi[0]}×{$gi[1]} غير صحيح، المطلوب {$need[0]}×{$need[1]} بكسل" . ($label ? ": $label" : ''));
   $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__)), '/'); $dir = "$root/ads-media";
   if (!is_dir($dir)) @mkdir($dir, 0755, true);
   $name = bin2hex(random_bytes(10)) . '.' . ($m[1] === 'jpeg' ? 'jpg' : $m[1]);
@@ -162,7 +166,7 @@ function buildCreatives(array $b, string $slots): array {
   foreach (explode(',', $slots) as $s) {
     foreach (array_keys(AD_SLOTS[$s]['dev']) as $dv) {
       $v = $in[$s][$dv] ?? '';
-      $u = is_string($v) && strncmp($v, 'data:image/', 11) === 0 ? saveUpload($v) : cleanImg($v);
+      $u = is_string($v) && strncmp($v, 'data:image/', 11) === 0 ? saveUpload($v, AD_SLOTS[$s]['dev'][$dv], AD_SLOTS[$s]['t'] . ' - ' . ['d' => 'كمبيوتر', 't' => 'تابلت', 'm' => 'جوال'][$dv]) : cleanImg($v);
       if ($u !== '') $creatives[$s][$dv] = $u;
     }
     if (empty($creatives[$s])) fail('أضف صورة واحدة على الأقل لمساحة: ' . AD_SLOTS[$s]['t']);
