@@ -192,7 +192,7 @@ function checkLimit(string $email): void {
 try {
   $a = $_GET['a'] ?? '';
   // الإعلانات والإحصاءات في ملف مستقل
-  if (in_array($a, ['ads', 'adev', 'adclick', 'hit', 'pubstats', 'report', 'adpricing', 'ad_booked', 'invoice', 'adv_register', 'adv_login', 'adv_me', 'adv_quote', 'adv_save', 'adv_cancel', 'adv_logout', 'adm_traffic', 'adm_ads', 'adm_quote', 'adm_ad_save', 'adm_ad_status', 'adm_ad_decide', 'adm_ad_del', 'adm_pricing_save', 'adm_slot_save', 'adm_adstxt'], true)) require __DIR__ . '/adserver.php';
+  if (in_array($a, ['ads', 'adev', 'adclick', 'hit', 'pubstats', 'report', 'adpricing', 'ad_booked', 'invoice', 'adv_register', 'adv_login', 'adv_forgot', 'adv_reset', 'adv_me', 'adv_quote', 'adv_save', 'adv_cancel', 'adv_logout', 'adm_traffic', 'adm_ads', 'adm_quote', 'adm_ad_save', 'adm_ad_status', 'adm_ad_decide', 'adm_ad_del', 'adm_pricing_save', 'adm_slot_save', 'adm_adstxt'], true)) require __DIR__ . '/adserver.php';
   if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $a !== 'ping' && $a !== 'unsub') fail('طلب غير صالح', 405);
   $b = body();
 

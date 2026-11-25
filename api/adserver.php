@@ -41,11 +41,12 @@ CREATE TABLE IF NOT EXISTS ad_pricing(slot TEXT PRIMARY KEY, cpm REAL, daily REA
 CREATE TABLE IF NOT EXISTS ad_settings(k TEXT PRIMARY KEY, v TEXT);
 CREATE TABLE IF NOT EXISTS advertisers(id INTEGER PRIMARY KEY, email TEXT UNIQUE, pass_hash TEXT, company TEXT, name TEXT, phone TEXT, created INTEGER, last_seen INTEGER, suspended INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS adv_tokens(token_hash TEXT PRIMARY KEY, adv_id INTEGER, created INTEGER);
+CREATE TABLE IF NOT EXISTS adv_resets(token_hash TEXT PRIMARY KEY, adv_id INTEGER, created INTEGER);
 SQL);
   $cols = array_column(db()->query('PRAGMA table_info(ad_campaigns)')->fetchAll(), 'name');
   $add = ['creatives' => "TEXT DEFAULT ''", 'ctype' => "TEXT DEFAULT 'paid'", 'pricing' => "TEXT DEFAULT 'cpm'", 'price' => 'REAL DEFAULT 0',
     'adv_id' => 'INTEGER DEFAULT 0', 'note' => "TEXT DEFAULT ''", 'decided' => 'INTEGER DEFAULT 0',
-    'quote' => "TEXT DEFAULT ''", 'invoice_no' => "TEXT DEFAULT ''", 'invoice_date' => "TEXT DEFAULT ''", 'paid_at' => 'INTEGER DEFAULT 0'];
+    'quote' => "TEXT DEFAULT ''", 'invoice_no' => "TEXT DEFAULT ''", 'invoice_date' => "TEXT DEFAULT ''", 'paid_at' => 'INTEGER DEFAULT 0', 'terms_at' => 'INTEGER DEFAULT 0'];
   $firstFiller = !in_array('ctype', $cols, true);
   foreach ($add as $c => $def) if (!in_array($c, $cols, true)) db()->exec("ALTER TABLE ad_campaigns ADD COLUMN $c $def");
   // الإعلانات التجريبية تتحول إلى إعلانات رديفة
@@ -145,7 +146,7 @@ function adQuote(array $slots, string $pricing, string $start, string $end, int 
       $st->execute([$exceptId, '%,' . $s . ',%', $end, $start]);
       if ($bk = $st->fetch()) fail('المساحة «' . AD_SLOTS[$s]['t'] . '» محجوزة حصرياً من ' . $bk['start'] . ' إلى ' . $bk['end'] . '. اختر أياماً أخرى غير المحجوزة');
       $cost = $days * $P[$s]['daily'];
-      $lines[] = ['slot' => $s, 't' => AD_SLOTS[$s]['t'], 'qty' => $days, 'unit' => $P[$s]['daily'], 'desc' => "$days يوم × " . $P[$s]['daily'], 'cost' => round($cost, 2), 'est' => $avg[$s] * $days];
+      $lines[] = ['slot' => $s, 't' => AD_SLOTS[$s]['t'], 'qty' => $days, 'unit' => $P[$s]['daily'], 'desc' => "$days يوم × " . $P[$s]['daily'] . ' ' . $S['currency'] . ' لليوم', 'cost' => round($cost, 2), 'est' => $avg[$s] * $days];
     } else {
       if (!$P[$s]['cpm_on']) fail('باقة مرات الظهور غير متاحة حالياً لمساحة: ' . AD_SLOTS[$s]['t']);
       // الحجز الحصري يمنع أي معلن آخر في نفس المساحة طوال مدته
@@ -155,7 +156,7 @@ function adQuote(array $slots, string $pricing, string $start, string $end, int 
       $cost = $impr / 1000 * $P[$s]['cpm'];
       $estDays = $avg[$s] > 0 ? (int)ceil($impr / $avg[$s]) : 0;
       if ($days && $avg[$s] > 0 && $estDays > $days) $warn[] = 'قد لا تكتمل مرات ظهور «' . AD_SLOTS[$s]['t'] . '» خلال المدة المحددة (تحتاج قرابة ' . $estDays . ' يوماً حسب الزيارات الحالية)';
-      $lines[] = ['slot' => $s, 't' => AD_SLOTS[$s]['t'], 'qty' => $impr, 'unit' => $P[$s]['cpm'], 'desc' => number_format($impr) . ' ظهور × ' . $P[$s]['cpm'] . ' لكل 1000', 'cost' => round($cost, 2), 'estDays' => $estDays];
+      $lines[] = ['slot' => $s, 't' => AD_SLOTS[$s]['t'], 'qty' => $impr, 'unit' => $P[$s]['cpm'], 'desc' => number_format($impr) . ' ظهور × ' . $P[$s]['cpm'] . ' ' . $S['currency'] . ' لكل 1000 ظهور', 'cost' => round($cost, 2), 'estDays' => $estDays];
     }
     $sub += $cost;
   }
@@ -386,6 +387,33 @@ switch ($a) {
     if (!empty($u['suspended'])) fail('هذا الحساب موقوف. تواصل مع فنتازيا', 403);
     out(['ok' => true, 'token' => advToken((int)$u['id']), 'adv' => advPublic($u)]);
   }
+  case 'adv_forgot': { // رابط إعادة تعيين كلمة المرور (صالح ساعة)
+    $email = cleanEmail($b['email'] ?? '');
+    $st = db()->prepare('SELECT * FROM advertisers WHERE email=?'); $st->execute([$email]); $u = $st->fetch();
+    if ($u) {
+      $c = db()->prepare('SELECT COUNT(*) FROM adv_resets WHERE adv_id=? AND created>?'); $c->execute([$u['id'], time() - 3600]);
+      if ($c->fetchColumn() >= 3) fail('أرسلنا لك رسائل كثيرة، تحقق من بريدك (والرسائل غير المرغوب فيها) أو جرّب بعد ساعة', 429);
+      $t = bin2hex(random_bytes(24));
+      db()->prepare('INSERT INTO adv_resets(token_hash,adv_id,created) VALUES(?,?,?)')->execute([hash('sha256', $t), $u['id'], time()]);
+      $link = 'https://fntazya.com/advertiser.html#reset=' . $t;
+      try { sendMail($email, 'إعادة تعيين كلمة مرور حساب المعلن - فنتازيا', 'إعادة تعيين كلمة المرور 🔑',
+        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($u['name']) . '،<br>طلبت إعادة تعيين كلمة مرور حسابك في بوابة معلني فنتازيا. اضغط الزر واختر كلمة مرور جديدة. الرابط صالح لمدة ساعة واحدة.</p>'
+        . '<p><a href="' . h($link) . '" style="background:#5b3cff;color:#fff;padding:10px 20px;border-radius:99px;text-decoration:none;font-weight:bold">اختيار كلمة مرور جديدة</a></p><p style="font-size:13px;color:#64748b">إذا لم تطلب ذلك تجاهل هذه الرسالة، وستبقى كلمة مرورك كما هي.</p>',
+        "لإعادة تعيين كلمة المرور (صالح ساعة): $link"); } catch (Throwable $e) { error_log('adv_forgot: ' . $e->getMessage()); }
+    }
+    out(['ok' => true]); // نفس الرد دائماً حتى لا يُعرف إن كان البريد مسجلاً
+  }
+  case 'adv_reset': {
+    $t = (string)($b['token'] ?? ''); $pass = (string)($b['password'] ?? '');
+    if (!preg_match('/^[a-f0-9]{48}$/', $t)) fail('الرابط غير صالح');
+    if (mb_strlen($pass) < 8) fail('كلمة المرور 8 أحرف على الأقل');
+    $st = db()->prepare('SELECT adv_id FROM adv_resets WHERE token_hash=? AND created>?'); $st->execute([hash('sha256', $t), time() - 3600]); $id = (int)$st->fetchColumn();
+    if (!$id) fail('انتهت صلاحية الرابط أو استُخدم من قبل. اطلب رابطاً جديداً');
+    db()->prepare('UPDATE advertisers SET pass_hash=? WHERE id=?')->execute([password_hash($pass, PASSWORD_DEFAULT), $id]);
+    db()->prepare('DELETE FROM adv_resets WHERE adv_id=?')->execute([$id]); db()->prepare('DELETE FROM adv_tokens WHERE adv_id=?')->execute([$id]);
+    $st = db()->prepare('SELECT * FROM advertisers WHERE id=?'); $st->execute([$id]);
+    out(['ok' => true, 'token' => advToken($id), 'adv' => advPublic($st->fetch())]);
+  }
   case 'adv_me': {
     $u = authAdv(); $S = adSettings();
     $st = db()->prepare('SELECT * FROM ad_campaigns WHERE adv_id=? ORDER BY created DESC'); $st->execute([$u['id']]);
@@ -404,14 +432,15 @@ switch ($a) {
     $slots = slotsFrom($b['slots'] ?? []);
     $q = adQuote($slots ? explode(',', $slots) : [], (string)($b['pricing'] ?? 'cpm'), cleanDate($b['start'] ?? ''), cleanDate($b['end'] ?? ''), (int)($b['impr'] ?? 0), $id);
     if (!cleanUrl($b['link'] ?? '')) fail('أضف رابط موقعك أو صفحة المنتج (يبدأ بـ https://)');
+    if (empty($b['terms'])) fail('يجب الموافقة على شروط الإعلان قبل الإرسال');
     [$creatives, $img] = buildCreatives($b, $slots);
     $name = mb_substr(trim(strip_tags((string)($b['name'] ?? ''))), 0, 100) ?: 'حملة ' . $u['company'];
     $vals = [$name, $u['company'], $slots, catsFrom($b['cats'] ?? []), 'image', $img, '', cleanUrl($b['link']), mb_substr(strip_tags((string)($b['alt'] ?? '')), 0, 150),
       $q['start'], $q['end'], 1, $q['pricing'] === 'cpm' ? $q['impr'] : 0, 'pending', json_encode($creatives, JSON_UNESCAPED_SLASHES), 'paid', $q['pricing'], $q['total'], (int)$u['id'], json_encode($q, JSON_UNESCAPED_UNICODE)];
     $again = $id > 0;
-    if ($id) { $vals[] = $id; db()->prepare('UPDATE ad_campaigns SET name=?,advertiser=?,slots=?,cats=?,kind=?,img=?,html=?,link=?,alt=?,start=?,end=?,weight=?,max_impr=?,status=?,creatives=?,ctype=?,pricing=?,price=?,adv_id=?,quote=?,note=\'\' WHERE id=?')->execute($vals); }
+    if ($id) { $vals[] = $id; db()->prepare('UPDATE ad_campaigns SET name=?,advertiser=?,slots=?,cats=?,kind=?,img=?,html=?,link=?,alt=?,start=?,end=?,weight=?,max_impr=?,status=?,creatives=?,ctype=?,pricing=?,price=?,adv_id=?,quote=?,note=\'\',terms_at=' . time() . ' WHERE id=?')->execute($vals); }
     else { $vals[] = bin2hex(random_bytes(16)); $vals[] = time();
-      db()->prepare('INSERT INTO ad_campaigns(name,advertiser,slots,cats,kind,img,html,link,alt,start,end,weight,max_impr,status,creatives,ctype,pricing,price,adv_id,quote,report_token,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($vals); $id = (int)db()->lastInsertId(); }
+      db()->prepare('INSERT INTO ad_campaigns(name,advertiser,slots,cats,kind,img,html,link,alt,start,end,weight,max_impr,status,creatives,ctype,pricing,price,adv_id,quote,report_token,created,terms_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,' . time() . ')')->execute($vals); $id = (int)db()->lastInsertId(); }
     try {
       $rows = '<p style="font-size:15px;line-height:1.9">الحملة: <b>' . h($name) . '</b><br>المعلن: ' . h($u['company']) . ' (' . h($u['email']) . ' · ' . h($u['phone']) . ')<br>'
         . ($q['pricing'] === 'daily' ? 'حجز حصري من ' . $q['start'] . ' إلى ' . $q['end'] : number_format($q['impr']) . ' مرة ظهور') . '<br>القيمة: <b>' . money($q['total'], $S) . '</b></p>'
