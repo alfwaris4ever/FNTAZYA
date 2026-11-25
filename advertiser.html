@@ -30,71 +30,107 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 8px;t
 .note{color:#64748b;font-size:13px;line-height:1.8}
 .pay{background:#f5f3ff;border-radius:14px;padding:14px;line-height:1.9;white-space:pre-line}
 .steps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.steps span{background:#eef1ff;border-radius:99px;padding:4px 12px;font-size:13px;font-weight:700}
+.blk{border:2px solid #e2e6ff}.blk h3{display:flex;align-items:center;gap:10px;font-size:18px;margin:0 0 10px;padding-bottom:10px;border-bottom:2px solid #eef1ff}.blk h4{margin:16px 0 8px;font-size:15px}
+.num{display:inline-flex;width:30px;height:30px;border-radius:50%;background:#5b3cff;color:#fff;align-items:center;justify-content:center;font-size:15px}
+.track{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:12px 0}.track span{padding:6px 14px;border-radius:99px;background:#f1f5f9;font-weight:700;font-size:14px;color:#94a3b8}.track i{flex:0 0 24px;height:2px;background:#e2e8f0}
+.track span.done{background:#dcfce7;color:#166534}.track span.now{background:#fef3c7;color:#92400e}.track span.bad{background:#fee2e2;color:#b91c1c}
+.rej{background:#fef2f2;border:2px solid #fecaca;border-radius:14px;padding:14px;line-height:1.8;margin:10px 0}
+.imgs{display:flex;flex-wrap:wrap;gap:10px}.imgs figure{margin:0;background:#f8fafc;border-radius:12px;padding:8px;max-width:320px}.imgs img{max-width:100%;max-height:140px;display:block;border-radius:8px}.imgs figcaption{font-size:12px;color:#64748b;margin-top:4px}
+.st.awaiting{background:#e0e7ff}
 .chk{flex-direction:row!important;align-items:center;gap:6px;font-weight:600!important;display:inline-flex!important;margin:3px 10px 3px 0}
 </style>
 </head>
 <body>
 <header><img src="icon-192.png" alt=""><h1>بوابة المعلنين · فنتازيا</h1><span id="hdr"></span><a href="advertise.html">الأسعار والباقات</a></header>
 <main id="app"><div class="card">جاري التحميل…</div></main>
-<script src="js/ad-form.js?v=20261125a"></script>
+<script src="js/ad-form.js?v=20261125b"></script>
 <script>
 const app=document.getElementById('app'),esc=AdForm.esc,fmt=AdForm.fmt;let tok=localStorage.getItem('fz:advtoken'),ME=null;
 const CATS={edu:'تعليمية',brain:'الذكاء',memory:'الذاكرة',focus:'التركيز',speed:'السرعة',logic:'المنطق',action:'حركة وسرعة',classic:'كلاسيكية',cars:'سيارات',io:'io',two:'لاعبَين',puzzle:'ألغاز',dress:'تلبيس وتجميل'};
-const ST={pending:'⏳ بانتظار الدفع والموافقة',active:'🟢 تعمل',paused:'⏸️ موقوفة مؤقتاً',rejected:'❌ تحتاج تعديلاً'};
+const ST={pending:'⏳ بانتظار الموافقة',awaiting:'💳 بانتظار السداد',active:'🟢 مقبولة وتعمل',paused:'⏸️ موقوفة مؤقتاً',rejected:'❌ مرفوضة، تحتاج تعديلاً'};
+const stName=c=>c.status==='active'&&!c.live?(c.start>new Date(Date.now()+108e5).toISOString().slice(0,10)?'🗓️ مقبولة، تبدأ '+c.start:'⚪ منتهية'):ST[c.status]||c.status;
 async function api(a,body={},auth=true){const r=await fetch('api/index.php?a='+a,{method:'POST',headers:{'Content-Type':'application/json',...(auth&&tok?{Authorization:'Bearer '+tok}:{})},body:JSON.stringify(body)});
   const j=await r.json().catch(()=>({ok:false,error:'الخادم لا يستجيب'}));if(r.status===401){tok=null;localStorage.removeItem('fz:advtoken');authView();throw new Error('auth')}if(!j.ok)throw new Error(j.error||'خطأ');return j}
 function authView(mode='login'){document.getElementById('hdr').innerHTML='';
-  app.innerHTML=`<div class="card" style="max-width:520px;margin:20px auto"><h2>📢 أعلن في فنتازيا</h2><p class="note">أنشئ حملتك بنفسك: اختر المساحات، وارفع صور إعلانك، وشاهد السعر مباشرة. بعد الدفع نفعّل حملتك وتتابع نتائجها لحظة بلحظة.</p>
+  app.innerHTML=`<div class="card" style="max-width:540px;margin:20px auto"><h2>📢 أعلن في فنتازيا</h2><p class="note">أنشئ حملتك بنفسك: اختر المساحات، وارفع صور إعلانك، وشاهد السعر مباشرة. نراجع إعلانك ونرسل لك الفاتورة، وبعد السداد تبدأ حملتك وتتابع نتائجها لحظة بلحظة.</p>
   <div class="tabs"><button class="btn ${mode==='login'?'':'alt'}" data-m="login">تسجيل الدخول</button><button class="btn ${mode==='reg'?'':'alt'}" data-m="reg">حساب معلن جديد</button></div>
   <form id="af" class="frm">${mode==='reg'?'<label>اسمك<input name="name" required></label><label>الشركة / العلامة التجارية<input name="company" required></label><label class="full">رقم الجوال<input name="phone" dir="ltr" inputmode="tel"></label>':''}
   <label class="full">البريد الإلكتروني<input name="email" type="email" dir="ltr" required></label><label class="full">كلمة المرور${mode==='reg'?' (8 أحرف على الأقل)':''}<input name="password" type="password" dir="ltr" required></label>
-  <div class="full err" id="er"></div><div class="full"><button class="btn" type="submit">${mode==='reg'?'إنشاء الحساب':'دخول'}</button></div></form></div>`;
+  <div class="full err" id="er"></div><div class="full"><button class="btn" type="submit">${mode==='reg'?'إنشاء الحساب':'دخول'}</button></div></form>
+  <p class="note" style="margin-top:14px">ℹ️ حساب المعلن منفصل عن حساب اللاعب في الألعاب. يمكنك استخدام نفس البريد للاثنين بلا أي تعارض، وإذا دخلت حساب اللاعب بنفس البريد يظهر لك زر «بوابة المعلنين» في لوحته.</p></div>`;
   app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>authView(b.dataset.m));
-  app.querySelector('#af').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));try{const j=await api(mode==='reg'?'adv_register':'adv_login',d,false);tok=j.token;localStorage.setItem('fz:advtoken',tok);dash()}catch(er){app.querySelector('#er').textContent=er.message}}}
-async function dash(msg){if(!tok)return authView();let j;try{j=ME=await api('adv_me')}catch(e){if(e.message!=='auth')app.innerHTML=`<div class="card err">${esc(e.message)}</div>`;return}
-  document.getElementById('hdr').innerHTML=`<button id="lo">خروج</button>`;document.getElementById('lo').onclick=async()=>{await api('adv_logout').catch(()=>{});tok=null;localStorage.removeItem('fz:advtoken');authView()};
-  const cur=j.settings.currency,sn=Object.fromEntries(j.slots.map(s=>[s.slot,s.t]));
+  app.querySelector('#af').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));try{const j=await api(mode==='reg'?'adv_register':'adv_login',d,false);tok=j.token;localStorage.setItem('fz:advtoken',tok);route()}catch(er){app.querySelector('#er').textContent=er.message}}}
+async function load(){ME=await api('adv_me');document.getElementById('hdr').innerHTML='<button id="lo">خروج</button>';
+  document.getElementById('lo').onclick=async()=>{await api('adv_logout').catch(()=>{});tok=null;localStorage.removeItem('fz:advtoken');location.hash='';authView()};return ME}
+async function route(){if(!tok)return authView();try{await load()}catch(e){if(e.message!=='auth')app.innerHTML=`<div class="card err">${esc(e.message)}</div>`;return}
+  const m=location.hash.match(/^#c=(\d+)/);if(m){const c=ME.campaigns.find(x=>x.id==m[1]);if(c)return detail(c)}dash()}
+addEventListener('hashchange',route);
+const sn=()=>Object.fromEntries(ME.slots.map(s=>[s.slot,s.t]));
+function pkg(c){return c.pricing==='daily'?`👑 حجز حصري ${c.start} ← ${c.end}`:`📊 ${fmt(c.max_impr)} ظهور لكل مساحة، تبدأ ${c.start||'فوراً'}`}
+function dash(msg){const j=ME,cur=j.settings.currency,N=sn();
   app.innerHTML=`${msg||''}<div class="card"><h2>👋 أهلاً ${esc(j.adv.name)} · ${esc(j.adv.company)}</h2><button class="btn" id="nc">➕ حملة إعلانية جديدة</button></div>
-  <div class="card"><h2>📋 حملاتي</h2><div style="overflow:auto"><table><tr><th>الحملة</th><th>المساحات</th><th>الباقة</th><th>القيمة</th><th>الحالة</th><th>ظهور</th><th>نقرات</th><th></th></tr>
-  ${j.campaigns.map(c=>`<tr><td><b>${esc(c.name)}</b></td><td>${c.slots.split(',').map(s=>esc(sn[s]||s)).join('<br>')}</td><td>${c.pricing==='daily'?`حصري ${c.start} ← ${c.end}`:`${fmt(c.max_impr)} ظهور`}</td><td>${AdForm.money(c.price,cur)}</td>
-   <td><span class="st ${c.status}">${c.status==='active'&&!c.live?'⚪ منتهية/لم تبدأ':ST[c.status]}</span>${c.note?`<div class="note">${esc(c.note)}</div>`:''}</td><td>${fmt(c.impr)}</td><td>${fmt(c.clicks)}</td>
-   <td style="white-space:nowrap">${['pending','rejected'].includes(c.status)?`<button class="btn sm alt" data-e="${c.id}">✏️ تعديل</button> <button class="btn sm alt" data-x="${c.id}">🗑️</button>`:`<a class="btn sm alt" href="ad-report.html?t=${c.report_token}" target="_blank">📊 التقرير</a>`}</td></tr>`).join('')||'<tr><td colspan=8>لا توجد حملات بعد. ابدأ أول حملة الآن.</td></tr>'}</table></div>
-  ${j.campaigns.some(c=>c.status==='pending')&&j.settings.pay_info?`<h3>💳 طريقة الدفع</h3><div class="pay">${esc(j.settings.pay_info)}</div><p class="note">بعد التحويل أرسل الإيصال على بريد الإدارة، ونفعّل حملتك ويصلك بريد بذلك.</p>`:''}</div>`;
-  app.querySelector('#nc').onclick=()=>form();
-  app.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>form(j.campaigns.find(c=>c.id==b.dataset.e)));
-  app.querySelectorAll('[data-x]').forEach(b=>b.onclick=async()=>{if(!confirm('حذف طلب الحملة؟'))return;await api('adv_cancel',{id:+b.dataset.x}).catch(e=>alert(e.message));dash()})}
-function form(c={}){const j=ME,S=j.settings,cur=S.currency,cr0={};try{Object.assign(cr0,JSON.parse(c.creatives||'{}'))}catch(e){}
-  const anyDaily=j.slots.some(s=>s.price.daily_on),anyCpm=j.slots.some(s=>s.price.cpm_on),cats=(c.cats||'').split(','),tomorrow=new Date(Date.now()+3*3600e3+864e5).toISOString().slice(0,10);
-  app.innerHTML=`<div class="card"><div class="steps"><span>1 المساحات</span><span>2 الباقة والمدة</span><span>3 صور الإعلان</span><span>4 الإرسال والدفع</span></div><h2>${c.id?'✏️ تعديل الحملة':'➕ حملة إعلانية جديدة'}</h2>
-  <form id="cf" class="frm"><label class="full">اسم الحملة<input name="name" value="${esc(c.name)}" placeholder="مثال: عروض العودة للمدارس"></label>
-  <div class="full"><h3>1) اختر مكان إعلانك</h3><p class="note">اضغط «👁️ مشاهدة موقع الإعلان» لترى مكانه على الجوال والتابلت والكمبيوتر.</p><div id="sb"></div></div>
-  <details class="full"><summary style="cursor:pointer;font-weight:700">🎯 استهداف أقسام معيّنة (اختياري)</summary><div style="margin-top:8px">${Object.entries(CATS).map(([k,v])=>`<label class="chk"><input type="checkbox" name="cats" value="${k}"${cats.includes(k)?' checked':''}> ${v}</label>`).join('')}</div><p class="note">اتركها فارغة ليظهر إعلانك في كل الموقع.</p></details>
-  <div class="full"><h3>2) الباقة والمدة</h3><div class="pk">
-   ${anyCpm?`<label class="${c.pricing!=='daily'?'on':''}"><input type="radio" name="pricing" value="cpm"${c.pricing!=='daily'?' checked':''}><span><b>📊 مرات ظهور</b><small>تدفع مقابل عدد مرات ظهور إعلانك، ويتناوب مع معلنين آخرين. مناسب للميزانيات المرنة.</small></span></label>`:''}
-   ${anyDaily?`<label class="${c.pricing==='daily'||!anyCpm?'on':''}"><input type="radio" name="pricing" value="daily"${c.pricing==='daily'||!anyCpm?' checked':''}><span><b>👑 حجز حصري بالأيام</b><small>إعلانك وحده في المساحة طوال الأيام المحجوزة، بدون أي معلن آخر.</small></span></label>`:''}</div></div>
-  <label class="k-cpm">عدد مرات الظهور (لكل مساحة)<select name="impr">${[10000,25000,50000,100000,250000,500000].filter(n=>n>=+S.min_impr).map(n=>`<option value="${n}"${+c.max_impr===n?' selected':''}>${fmt(n)}</option>`).join('')}</select></label>
-  <label>تاريخ البداية<input type="date" name="start" min="${tomorrow}" value="${esc(c.start||tomorrow)}"></label><label>تاريخ النهاية <small class="k-cpm note">(اختياري)</small><input type="date" name="end" min="${tomorrow}" value="${esc(c.end)}"></label>
-  <div class="full" id="qb"></div>
-  <div class="full"><h3>3) صور الإعلان</h3><div id="crs"></div></div>
-  <label class="full">رابط موقعك أو صفحة المنتج<input name="link" dir="ltr" value="${esc(c.link)}" placeholder="https://"></label>
-  <label class="full">وصف قصير للإعلان (يُقرأ لضعاف البصر)<input name="alt" value="${esc(c.alt)}"></label>
-  <div class="full note">✅ نراجع كل إعلان قبل نشره: يجب أن يكون مناسباً للأطفال والعائلات. الخروج من الموقع عبر إعلانك يمر ببوابة الأهل.</div>
-  <div class="full err" id="er"></div><div class="full"><button class="btn" type="submit">📨 إرسال الحملة</button> <button class="btn alt" type="button" id="bk">رجوع</button></div></form></div>`;
+  <div class="card"><h2>📋 حملاتي</h2><div style="overflow:auto"><table><tr><th>الحملة</th><th>المساحات</th><th>الباقة</th><th>القيمة</th><th>الحالة</th><th>ظهور</th><th>نقرات</th></tr>
+  ${j.campaigns.map(c=>`<tr><td><a href="#c=${c.id}"><b>${esc(c.name)}</b></a></td><td>${c.slots.split(',').map(s=>esc(N[s]||s)).join('<br>')}</td><td>${pkg(c)}</td><td>${AdForm.money(c.price,cur)}</td>
+   <td><span class="st ${c.status}">${stName(c)}</span></td><td>${fmt(c.impr)}</td><td>${fmt(c.clicks)}</td></tr>`).join('')||'<tr><td colspan=7>لا توجد حملات بعد. ابدأ أول حملة الآن.</td></tr>'}</table></div><p class="note">اضغط اسم الحملة لترى تفاصيلها وحالتها.</p></div>`;
+  app.querySelector('#nc').onclick=()=>form()}
+function detail(c){const cur=ME.settings.currency,N=sn();let cr={};try{cr=JSON.parse(c.creatives||'{}')}catch(e){}
+  const steps=[['pending','⏳ المراجعة'],['awaiting','💳 السداد'],['active','🚀 التشغيل']],idx=c.status==='rejected'?0:c.status==='pending'?0:c.status==='awaiting'?1:2;
+  app.innerHTML=`<div class="card"><a href="#" class="note">→ كل حملاتي</a><h2 style="margin-top:6px">${esc(c.name)} <span class="st ${c.status}">${stName(c)}</span></h2>
+  <div class="track">${steps.map((s,i)=>`<span class="${c.status==='rejected'&&i===0?'bad':i<idx||(i===idx&&c.status==='active')?'done':i===idx?'now':''}">${s[1]}</span>`).join('<i></i>')}</div>
+  ${c.status==='rejected'?`<div class="rej"><b>❌ سبب الرفض:</b> ${esc(c.note||'لم يُذكر سبب')}<br><button class="btn" id="ed" style="margin-top:10px">✏️ تعديل الحملة وإعادة الإرسال</button></div>`:''}
+  ${c.status==='pending'?`<p class="note">نراجع إعلانك الآن، ويصلك بريد بالفاتورة عند الموافقة. يمكنك تعديل الحملة قبل المراجعة.</p><button class="btn alt" id="ed">✏️ تعديل</button> <button class="btn alt" id="del">🗑️ حذف الطلب</button>`:''}
+  ${c.status==='awaiting'?`<p>✅ تمت الموافقة على إعلانك. سدّد الفاتورة لتبدأ الحملة.</p><a class="btn" href="invoice.html?t=${c.report_token}" target="_blank">📄 عرض الفاتورة ${esc(c.invoice_no)}</a>`:''}
+  ${['active','paused'].includes(c.status)?`<a class="btn" href="ad-report.html?t=${c.report_token}" target="_blank">📊 التقرير المباشر</a> ${c.invoice_no?`<a class="btn alt" href="invoice.html?t=${c.report_token}" target="_blank">📄 الفاتورة</a>`:''}`:''}</div>
+  <div class="card"><h2>📝 تفاصيل الحملة</h2><table><tr><td>المساحات</td><td>${c.slots.split(',').map(s=>esc(N[s]||s)).join('، ')}</td></tr><tr><td>الأقسام</td><td>${c.cats?c.cats.split(',').map(k=>CATS[k]||k).join('، '):'كل الموقع'}</td></tr>
+   <tr><td>الباقة</td><td>${pkg(c)}</td></tr><tr><td>القيمة</td><td><b>${AdForm.money(c.price,cur)}</b></td></tr><tr><td>الرابط</td><td dir="ltr"><a href="${esc(c.link)}" target="_blank" rel="noopener">${esc(c.link)}</a></td></tr>
+   <tr><td>الأداء</td><td>${fmt(c.impr)} ظهور · ${fmt(c.clicks)} نقرة</td></tr></table>
+   <h3>🖼️ صور الإعلان</h3><div class="imgs">${Object.entries(cr).map(([s,v])=>Object.entries(v).map(([d,u])=>`<figure><img src="${esc(u)}" alt=""><figcaption>${esc(N[s]||s)} · ${{d:'💻 كمبيوتر',t:'📱 تابلت',m:'📲 جوال'}[d]}</figcaption></figure>`).join('')).join('')}</div></div>`;
+  app.querySelector('#ed')?.addEventListener('click',()=>form(c));
+  app.querySelector('#del')?.addEventListener('click',async()=>{if(!confirm('حذف طلب الحملة؟'))return;await api('adv_cancel',{id:c.id}).catch(e=>alert(e.message));location.hash='';route()})}
+async function form(c={}){const j=ME,S=j.settings,cur=S.currency,cr0={};try{Object.assign(cr0,JSON.parse(c.creatives||'{}'))}catch(e){}
+  const anyDaily=j.slots.some(s=>s.price.daily_on),anyCpm=j.slots.some(s=>s.price.cpm_on);
+  let bk;try{bk=await api('ad_booked',{id:c.id||0},false)}catch(e){bk={booked:{},today:new Date().toISOString().slice(0,10)}}
+  const minD=bk.today>(c.start||'')?bk.today:bk.today;const daily0=c.pricing==='daily'||!anyCpm;
+  app.innerHTML=`<div class="card"><div class="steps"><span>1 المساحات</span><span>2 الباقة والمدة</span><span>3 صور الإعلان</span><span>4 الإرسال</span></div><h2>${c.id?'✏️ تعديل الحملة':'➕ حملة إعلانية جديدة'}</h2>
+  <label>اسم الحملة<input id="nm" value="${esc(c.name)}" placeholder="مثال: عروض العودة للمدارس"></label></div>
+  <form id="cf">
+  <section class="card blk"><h3><span class="num">1</span> المساحات</h3><p class="note">اضغط «👁️ مشاهدة موقع الإعلان» لترى مكانه على الجوال والتابلت والكمبيوتر.</p><div id="sb"></div>
+   <h4>🎯 الأقسام التي يظهر فيها إعلانك</h4><div id="cb"></div></section>
+  <section class="card blk"><h3><span class="num">2</span> الباقة والمدة</h3><div class="pk">
+   ${anyCpm?`<label class="${!daily0?'on':''}"><input type="radio" name="pricing" value="cpm"${!daily0?' checked':''}><span><b>📊 مرات ظهور</b><small>تدفع مقابل عدد مرات ظهور إعلانك، ويتناوب مع معلنين آخرين. تنتهي الحملة تلقائياً عند اكتمال العدد.</small></span></label>`:''}
+   ${anyDaily?`<label class="${daily0?'on':''}"><input type="radio" name="pricing" value="daily"${daily0?' checked':''}><span><b>👑 حجز حصري بالأيام</b><small>إعلانك وحده في المساحة طوال الأيام المحجوزة، ولا يُقبل أي معلن آخر فيها.</small></span></label>`:''}</div>
+   <label class="k-cpm" style="margin-top:12px">عدد مرات الظهور (لكل مساحة)<select name="impr">${[10000,25000,50000,100000,250000,500000].filter(n=>n>=+S.min_impr).map(n=>`<option value="${n}"${+c.max_impr===n?' selected':''}>${fmt(n)}</option>`).join('')}</select></label>
+   <h4 id="calT"></h4><div id="cal"></div><div id="qb" style="margin-top:12px"></div></section>
+  <section class="card blk"><h3><span class="num">3</span> صور الإعلان</h3><div id="crs"></div>
+   <label style="margin-top:10px">رابط موقعك أو صفحة المنتج<input name="link" dir="ltr" value="${esc(c.link)}" placeholder="https://"></label>
+   <label style="margin-top:10px">وصف قصير للإعلان (يُقرأ لضعاف البصر)<input name="alt" value="${esc(c.alt)}"></label></section>
+  <section class="card blk"><h3><span class="num">4</span> الإرسال</h3><div id="sum"></div>
+   <p class="note">✅ نراجع كل إعلان قبل نشره: يجب أن يكون مناسباً للأطفال والعائلات، والخروج من الموقع عبر إعلانك يمر ببوابة الأهل.<br>📄 بعد الموافقة نرسل لك فاتورة إلكترونية، وبعد السداد نفعّل حملتك.</p>
+   <div class="err" id="er"></div><button class="btn" type="submit">📨 إرسال الحملة للمراجعة</button> <button class="btn alt" type="button" id="bk">رجوع</button></section></form>`;
   const f=app.querySelector('#cf'),err=m=>app.querySelector('#er').textContent=m||'';
-  const getSel=AdForm.slotPicker(app.querySelector('#sb'),j.slots,(c.slots||'').split(','),{showPrice:true,currency:cur,onChange:()=>{crs.draw();quote()}});
+  const getSel=AdForm.slotPicker(app.querySelector('#sb'),j.slots,(c.slots||'').split(','),{showPrice:true,currency:cur,onChange:()=>{crs.draw();cal.set({booked:booked()});quote()}});
+  const getCats=AdForm.catsPicker(app.querySelector('#cb'),CATS,(c.cats||'').split(','));
   const crs=AdForm.creatives(app.querySelector('#crs'),j.slots,getSel,cr0,err);
+  const booked=()=>getSel().flatMap(s=>bk.booked[s]||[]);
+  const mode=()=>(f.pricing?.value||'cpm')==='daily'?'range':'single';
+  const cal=AdForm.calendar(app.querySelector('#cal'),{mode:mode(),min:minD,booked:booked(),start:c.start&&c.start>=minD?c.start:'',end:c.pricing==='daily'?c.end:'',onChange:()=>quote()});
   let qt,lastQ=null;const quote=()=>{clearTimeout(qt);qt=setTimeout(async()=>{const p=f.pricing?.value||'cpm';f.querySelectorAll('.pk label').forEach(l=>l.classList.toggle('on',l.querySelector('input').checked));app.querySelectorAll('.k-cpm').forEach(x=>x.hidden=p!=='cpm');
-    if(!getSel().length){app.querySelector('#qb').innerHTML='<div class="af-q note">اختر مساحة لترى السعر.</div>';lastQ=null;return}
-    try{const r=await api('adv_quote',{id:c.id||0,slots:getSel(),pricing:p,start:f.start.value,end:f.end.value,impr:+f.impr.value});lastQ=r.quote;app.querySelector('#qb').innerHTML=AdForm.quoteHTML(r.quote)}
-    catch(e){lastQ=null;if(e.message!=='auth')app.querySelector('#qb').innerHTML=AdForm.quoteHTML(null,e.message)}},250)};
-  f.querySelectorAll('[name=pricing],[name=start],[name=end],[name=impr]').forEach(x=>x.addEventListener('input',quote));quote();
-  app.querySelector('#bk').onclick=()=>dash();
-  f.onsubmit=async e=>{e.preventDefault();err();const fd=new FormData(f);if(!getSel().length)return err('اختر مساحة إعلانية');
+    app.querySelector('#calT').textContent=p==='daily'?'🗓️ أيام الحجز (من - إلى)':'🗓️ تاريخ بداية الحملة';
+    const d=cal.get(),sum=app.querySelector('#sum');
+    if(!getSel().length){app.querySelector('#qb').innerHTML='<div class="af-q note">اختر مساحة لترى السعر.</div>';sum.innerHTML='';lastQ=null;return}
+    if(!d.start||(p==='daily'&&!d.end)){app.querySelector('#qb').innerHTML=`<div class="af-q note">${p==='daily'?'اختر يوم البداية ويوم النهاية من التقويم':'اختر تاريخ البداية من التقويم'} لترى السعر.</div>`;sum.innerHTML='';lastQ=null;return}
+    try{const r=await api('adv_quote',{id:c.id||0,slots:getSel(),pricing:p,start:d.start,end:p==='daily'?d.end:'',impr:+f.impr.value});lastQ=r.quote;app.querySelector('#qb').innerHTML=AdForm.quoteHTML(r.quote);
+      sum.innerHTML=`<div class="af-q"><b>الإجمالي: ${AdForm.money(r.quote.total,r.quote.currency)}</b><div class="note">${getSel().length} مساحة · ${p==='daily'?`حجز حصري ${r.quote.days} يوم`:`${fmt(r.quote.impr)} ظهور لكل مساحة`}</div></div>`}
+    catch(e){lastQ=null;sum.innerHTML='';if(e.message!=='auth')app.querySelector('#qb').innerHTML=AdForm.quoteHTML(null,e.message)}},250)};
+  f.querySelectorAll('[name=pricing]').forEach(x=>x.addEventListener('change',()=>{cal.set({mode:mode(),end:''});quote()}));f.impr?.addEventListener('change',quote);quote();
+  app.querySelector('#bk').onclick=()=>{location.hash='';route()};
+  f.onsubmit=async e=>{e.preventDefault();err();const fd=new FormData(f),d=cal.get(),cats=getCats();
+    if(!getSel().length)return err('اختر مساحة إعلانية');if(cats===null)return err('اختر قسماً واحداً على الأقل، أو «الكل»');if(!lastQ)return err('أكمل اختيار الباقة والتاريخ');
     const b=f.querySelector('[type=submit]');b.disabled=true;b.textContent='⏳ جاري الإرسال…';
-    try{const r=await api('adv_save',{id:c.id||0,name:fd.get('name'),slots:getSel(),cats:fd.getAll('cats'),pricing:fd.get('pricing')||'cpm',impr:+fd.get('impr'),start:fd.get('start'),end:fd.get('end'),creatives:crs.value(),link:fd.get('link'),alt:fd.get('alt')});
-      scrollTo(0,0);dash(`<div class="card"><h2 class="ok">✅ استلمنا حملتك!</h2><p>قيمة الحملة: <b>${AdForm.money(r.quote.total,r.quote.currency)}</b>. بعد إتمام الدفع نراجع الإعلان ونفعّله، ويصلك بريد بذلك.</p>${r.pay_info?`<div class="pay"><b>💳 طريقة الدفع</b>\n${esc(r.pay_info)}</div>`:'<p class="note">سيتواصل معك فريق فنتازيا لإتمام الدفع.</p>'}</div>`)}
-    catch(er){if(er.message!=='auth'){err(er.message);b.disabled=false;b.textContent='📨 إرسال الحملة'}}}}
-dash();
+    try{const r=await api('adv_save',{id:c.id||0,name:app.querySelector('#nm').value,slots:getSel(),cats,pricing:fd.get('pricing')||'cpm',impr:+fd.get('impr'),start:d.start,end:fd.get('pricing')==='daily'?d.end:'',creatives:crs.value(),link:fd.get('link'),alt:fd.get('alt')});
+      scrollTo(0,0);await load();location.hash='c='+r.id;}
+    catch(er){if(er.message!=='auth'){err(er.message);b.disabled=false;b.textContent='📨 إرسال الحملة للمراجعة'}}}}
+route();
 </script>
 </body>
 </html>

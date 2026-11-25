@@ -82,8 +82,8 @@ function loginForm(note=''){app.innerHTML=`<div class="msg" style="max-width:380
     if(!j.ok)return er.textContent=j.error;token=j.token;localStorage.setItem('fz:token',j.token);localStorage.setItem('fz:user',JSON.stringify(j.user));load()};
   document.getElementById('li').onclick=()=>go('login');document.getElementById('rg').onclick=()=>go('register')}
 </script>
-<script src="js/ad-form.js?v=20261125a"></script>
-<script src="js/admin-ads.js?v=20261123c"></script>
+<script src="js/ad-form.js?v=20261125b"></script>
+<script src="js/admin-ads.js?v=20261125b"></script>
 <script>addEventListener('hashchange',load);load()</script>
 </body>
 </html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>فاتورة | فنتازيا</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Tahoma,system-ui,sans-serif;background:#eef1ff;color:#1d2350}
+.bar{max-width:820px;margin:18px auto 0;display:flex;gap:8px;justify-content:flex-end;padding:0 14px}
+.bar button,.bar a{font:inherit;font-weight:700;border:0;border-radius:99px;padding:9px 20px;background:#5b3cff;color:#fff;cursor:pointer;text-decoration:none}.bar a{background:#fff;color:#1d2350}
+.inv{max-width:820px;margin:14px auto 30px;background:#fff;border-radius:20px;box-shadow:0 8px 28px rgba(29,35,80,.1);overflow:hidden}
+.hd{display:flex;align-items:center;gap:14px;padding:22px 26px;background:linear-gradient(135deg,#5b3cff,#ec4899);color:#fff}
+.hd img{width:56px;height:56px;border-radius:14px;background:#fff}.hd h1{margin:0;font-size:24px}.hd .t{flex:1}.hd small{opacity:.9}
+.st{font-weight:800;padding:6px 16px;border-radius:99px;background:#fff;color:#b45309}.st.paid{color:#15803d}
+.bd{padding:22px 26px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}@media(max-width:600px){.grid{grid-template-columns:1fr}}
+.box{background:#f8fafc;border-radius:14px;padding:14px;line-height:1.9;font-size:14px}.box b.h{display:block;color:#5b3cff;margin-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:10px 8px;border-bottom:1px solid #eef1ff;text-align:right}th{background:#f5f3ff;color:#475569}
+td.n{white-space:nowrap;text-align:left;direction:ltr}
+.tot td{font-weight:800;font-size:17px;border-bottom:0}.tot td.n{color:#5b3cff;font-size:20px}
+.pay{margin-top:18px;background:#f5f3ff;border:2px dashed #c4b5fd;border-radius:14px;padding:14px;line-height:1.9;white-space:pre-line}
+.ft{color:#64748b;font-size:12px;text-align:center;padding:0 26px 22px;line-height:1.8}
+.msg{max-width:600px;margin:40px auto;background:#fff;border-radius:16px;padding:24px;text-align:center;font-weight:700}
+@media print{body{background:#fff}.bar{display:none}.inv{box-shadow:none;margin:0;border-radius:0}.hd{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="bar"><a href="advertiser.html">بوابة المعلنين</a><button onclick="print()">🖨️ طباعة / حفظ PDF</button></div>
+<div id="r"><div class="msg">جاري التحميل…</div></div>
+<script>
+const R=document.getElementById('r'),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=(v,c)=>Number(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+c;
+(async()=>{const t=new URLSearchParams(location.search).get('t')||'';
+ try{const j=await (await fetch('api/index.php?a=invoice&t='+encodeURIComponent(t))).json();if(!j.ok)throw new Error(j.error);
+  const I=j.invoice,S=j.seller,B=j.buyer,C=j.campaign,Q=j.quote,cur=j.currency;document.title='فاتورة '+I.no+' | فنتازيا';
+  R.innerHTML=`<div class="inv"><div class="hd"><img src="icon-192.png" alt=""><div class="t"><h1>${S.vat?'فاتورة ضريبية مبسطة':'فاتورة'}</h1><small>رقم ${esc(I.no)} · ${esc(I.date)}</small></div><span class="st ${I.paid?'paid':''}">${I.paid?'✅ مسددة':'⏳ بانتظار السداد'}</span></div>
+  <div class="bd"><div class="grid"><div class="box"><b class="h">من</b>${esc(S.name)}${S.cr?`<br>السجل: ${esc(S.cr)}`:''}${S.vat?`<br>الرقم الضريبي: ${esc(S.vat)}`:''}${S.address?`<br>${esc(S.address)}`:''}<br><span dir="ltr">${esc(S.email)}</span> · fntazya.com</div>
+   <div class="box"><b class="h">إلى</b>${esc(B.company)}${B.name?`<br>${esc(B.name)}`:''}${B.email?`<br><span dir="ltr">${esc(B.email)}</span>`:''}${B.phone?`<br><span dir="ltr">${esc(B.phone)}</span>`:''}</div></div>
+  <div class="box" style="margin-bottom:16px"><b class="h">الحملة</b>${esc(C.name)} · ${C.pricing==='daily'?`حجز حصري من ${esc(C.start)} إلى ${esc(C.end)}`:`${Number(C.impr).toLocaleString('en-US')} مرة ظهور لكل مساحة، تبدأ ${esc(C.start)}`}</div>
+  <table><tr><th>البند</th><th>التفاصيل</th><th style="text-align:left">المبلغ</th></tr>
+   ${Q.lines.map(l=>`<tr><td>${esc(l.t)}</td><td>${esc(l.desc)}</td><td class="n">${money(l.cost,cur)}</td></tr>`).join('')}
+   <tr><td colspan="2">المجموع قبل الضريبة</td><td class="n">${money(Q.subtotal,cur)}</td></tr>
+   ${Q.vatRate?`<tr><td colspan="2">ضريبة القيمة المضافة ${Q.vatRate}%</td><td class="n">${money(Q.vat,cur)}</td></tr>`:''}
+   <tr class="tot"><td colspan="2">الإجمالي المستحق</td><td class="n">${money(Q.total,cur)}</td></tr></table>
+  ${I.paid?`<div class="pay">✅ تم استلام السداد بتاريخ ${esc(I.paid_date)}. شكراً لك.</div>`:`<div class="pay"><b>💳 طريقة السداد</b> (آخر موعد: ${esc(I.due)})\n${j.pay_info?esc(j.pay_info):'سيتواصل معك فريق فنتازيا بتفاصيل السداد.'}\nاكتب رقم الفاتورة ${esc(I.no)} في وصف التحويل، وأرسل الإيصال على ${esc(S.email)}.</div>`}</div>
+  <div class="ft">فاتورة إلكترونية صادرة من فنتازيا · fntazya.com<br>تبدأ الحملة بعد تأكيد السداد، ويصلك رابط التقرير المباشر على بريدك.</div></div>`}
+ catch(e){R.innerHTML=`<div class="msg">${esc(e.message||'تعذّر تحميل الفاتورة')}</div>`}})();
+</script>
+</body>
+</html>
