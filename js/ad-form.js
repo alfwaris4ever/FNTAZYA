@@ -33,7 +33,8 @@ const AdForm = (() => {
 .af-cr-tile{background:#f8fafc;border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px}.af-cr-h{font-weight:700;font-size:13px;display:flex;justify-content:space-between;gap:6px}
 .af-cr-prev{width:100%;max-height:150px;background:repeating-conic-gradient(#e2e8f0 0 25%,#fff 0 50%) 0 0/16px 16px;border:2px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .af-cr-prev img{width:100%;height:100%;object-fit:contain}.af-cr-prev span{color:#94a3b8;font-size:12px;font-weight:700}
-.af-cr-info{font-size:12px;color:#64748b;min-height:1.2em}.af-cr-info.ok{color:#16a34a}.af-cr-info.warn{color:#d97706}.af-cr-act{display:flex;gap:6px;align-items:center}
+.af-cr-info{font-size:12px;color:#64748b;min-height:1.2em}.af-cr-info.ok{color:#16a34a}.af-cr-info.warn{color:#d97706}.af-cr-info.bad{color:#dc2626;font-weight:700;background:#fee2e2;border-radius:8px;padding:5px 7px;line-height:1.6}.af-cr-act{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.af-tpl{font:inherit;font-weight:700;font-size:13px;border:2px solid #5b3cff;background:#fff;color:#5b3cff;border-radius:10px;padding:3px 10px;cursor:pointer}.af-tpl:hover{background:#f5f3ff}
 .af-up{background:#5b3cff;color:#fff;border-radius:10px;padding:5px 12px;font-weight:700;font-size:13px;cursor:pointer;display:inline-block}
 .af-rm{font:inherit;border:0;background:#fee2e2;border-radius:10px;padding:5px 10px;cursor:pointer}
 .af-q{background:#f5f3ff;border:2px solid #ddd6fe;border-radius:16px;padding:14px}.af-q table{width:100%;border-collapse:collapse;font-size:14px;background:transparent;box-shadow:none}
@@ -70,32 +71,73 @@ const AdForm = (() => {
     return () => [...box.querySelectorAll('input[name=slots]:checked')].map((x) => x.value);
   }
 
+  /* فحص ملف الصورة قبل الرفع: المقاس الفعلي ونظام الألوان (CMYK مرفوض) */
+  async function inspect(file) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const u16 = (i) => (buf[i] << 8) | buf[i + 1], u32 = (i) => ((buf[i] << 24) | (buf[i + 1] << 16) | (buf[i + 2] << 8) | buf[i + 3]) >>> 0;
+    let type = '', w = 0, h = 0, cmyk = false;
+    if (buf[0] === 0x89 && buf[1] === 0x50) { type = 'PNG'; w = u32(16); h = u32(20); }
+    else if (buf[0] === 0xff && buf[1] === 0xd8) { type = 'JPG';
+      for (let i = 2; i < buf.length - 9;) { if (buf[i] !== 0xff) { i++; continue; } const m = buf[i + 1];
+        if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) { h = u16(i + 5); w = u16(i + 7); cmyk = buf[i + 9] === 4; break; }
+        if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; } i += 2 + u16(i + 2); } }
+    else if (buf[0] === 0x47 && buf[1] === 0x49) type = 'GIF';
+    else if (buf[8] === 0x57 && buf[9] === 0x45) type = 'WEBP';
+    if (!type) return { err: 'صيغة غير مدعومة. استخدم PNG أو JPG أو WEBP أو GIF' };
+    if (!w || !h) { const url = URL.createObjectURL(file); try { const im = new Image(); im.src = url; await im.decode(); w = im.naturalWidth; h = im.naturalHeight; } catch (e) { return { err: 'تعذّرت قراءة الصورة' }; } finally { URL.revokeObjectURL(url); } }
+    return { type, w, h, cmyk };
+  }
+
+  /* نموذج جاهز بالمقاس الصحيح يحمّله المصمم ويصمم عليه */
+  function template(slotTitle, devName, w, h, fname) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i <= Math.max(w, h); i += 10) { x.strokeStyle = i % 50 ? '#f1f4ff' : '#dfe5ff'; x.lineWidth = 1; x.beginPath(); x.moveTo(i + 0.5, 0); x.lineTo(i + 0.5, h); x.moveTo(0, i + 0.5); x.lineTo(w, i + 0.5); x.stroke(); }
+    // المنطقة الآمنة (الحواف تُقص بانحناء 14px)
+    x.setLineDash([6, 4]); x.strokeStyle = '#5b3cff'; x.lineWidth = 2; x.strokeRect(9, 9, w - 18, h - 18); x.setLineDash([]);
+    x.strokeStyle = '#94a3b8'; x.lineWidth = 1; x.beginPath(); x.roundRect ? x.roundRect(0.5, 0.5, w - 1, h - 1, 14) : x.rect(0.5, 0.5, w - 1, h - 1); x.stroke();
+    // مكان شارة «إعلان» (أعلى اليمين) لا تضع فيها نصاً مهماً
+    x.fillStyle = 'rgba(239,68,68,.16)'; x.strokeStyle = '#ef4444'; x.fillRect(w - 52, 4, 48, 20); x.strokeRect(w - 52 + 0.5, 4.5, 47, 19);
+    x.fillStyle = '#b91c1c'; x.font = 'bold 11px Tahoma, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.direction = 'rtl'; x.fillText('إعلان', w - 28, 14.5);
+    // النصوص
+    const f = Math.max(10, Math.min(h * 0.2, w * 0.045, 30)), lines = [[`نموذج إعلان فنتازيا · ${devName}`, '#1d2350', 'bold'], [`${w} × ${h} px`, '#5b3cff', 'bold'], ['RGB · PNG أو JPG · حتى 1.5MB · صمّم داخل الخط المتقطع', '#64748b', '']];
+    const lh = f * 1.25, sizes = [f, f * 1.1, f * 0.62]; let tot = sizes.reduce((s, z) => s + z * 1.25, 0), y = h / 2 - tot / 2;
+    lines.forEach(([t, col, wt], i) => { x.font = `${wt} ${sizes[i]}px Tahoma, sans-serif`; x.fillStyle = col; x.direction = i === 1 ? 'ltr' : 'rtl'; y += sizes[i] * 1.25 / 2; x.fillText(t, w / 2, y, w - 70); y += sizes[i] * 1.25 / 2; });
+    c.toBlob((b) => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, 'image/png');
+  }
+
   /* خانات صور الإعلان لكل مساحة ولكل جهاز */
   function creatives(box, slots, getSel, cur, onErr) {
     css();
-    const pend = {};
+    const pend = {}, msgs = {};
     const val = (s, dv) => pend[s]?.[dv] ?? cur[s]?.[dv] ?? '';
     const check = (tile, w, h) => {
-      const img = tile.querySelector('img'), info = tile.querySelector('.af-cr-info');
-      if (!img) { info.textContent = 'لا توجد صورة'; info.className = 'af-cr-info'; return; }
-      const go = () => { const rw = img.naturalWidth, rh = img.naturalHeight; if (!rw) return;
-        const ok = Math.abs(rw / rh - w / h) / (w / h) < 0.08, big = rw >= w;
-        info.textContent = `${rw}×${rh} · ${ok ? (big ? '✅ مقاس مناسب' : '⚠️ النسبة صحيحة لكن الدقة منخفضة') : `⚠️ المطلوب ${w}×${h}، وستظهر الصورة بشكل مختلف`}`;
-        info.className = 'af-cr-info ' + (ok && big ? 'ok' : 'warn'); };
+      const img = tile.querySelector('img'), info = tile.querySelector('.af-cr-info'), m = msgs[tile.dataset.s + tile.dataset.d];
+      if (m) { info.textContent = m; info.className = 'af-cr-info bad'; return; }
+      if (!img) { info.textContent = 'لم تُرفع صورة'; info.className = 'af-cr-info'; return; }
+      const go = () => { const rw = img.naturalWidth, rh = img.naturalHeight; if (!rw) return; const ok = Math.abs(rw - w) <= 5 && Math.abs(rh - h) <= 5;
+        info.textContent = `${rw}×${rh} · ${ok ? '✅ مقاس صحيح' : '⚠️ مقاس مختلف عن المطلوب'}`; info.className = 'af-cr-info ' + (ok ? 'ok' : 'warn'); };
       img.complete ? go() : (img.onload = go);
     };
     const draw = () => {
       const sel = getSel();
-      box.innerHTML = sel.length ? '<p class="af-pv-n" style="margin:0 0 8px">ارفع صورة بالمقاس المكتوب لكل جهاز. إن لم ترفع صورة التابلت أو الجوال تُستخدم صورة الكمبيوتر وقد تظهر صغيرة.</p>' + sel.map((s) => { const S = slots.find((x) => x.slot === s);
+      box.innerHTML = sel.length ? '<p class="af-pv-n" style="margin:0 0 8px">حمّل النموذج ⬇️ وصمّم عليه، ثم ارفع الصورة بنفس المقاس بالضبط (يُقبل فرق 5 بكسل فقط) وبألوان RGB. إن لم ترفع صورة التابلت أو الجوال تُستخدم صورة الكمبيوتر وقد تظهر صغيرة.</p>' + sel.map((s) => { const S = slots.find((x) => x.slot === s);
         return `<div class="af-cr-slot"><b>${esc(S.t)}</b> <button type="button" class="af-eye" data-pv="${s}" style="margin-inline-start:6px;padding:3px 10px">👁️</button><div class="af-cr-row">${Object.entries(S.dev).map(([dv, [w, h]]) => { const v = val(s, dv);
           return `<div class="af-cr-tile" data-s="${s}" data-d="${dv}" data-w="${w}" data-h="${h}"><div class="af-cr-h"><span>${Object.keys(S.dev).length === 1 ? '🖥️📱 كل الأجهزة' : DEV[dv]}</span><span dir="ltr">${w}×${h}</span></div>
             <div class="af-cr-prev" style="aspect-ratio:${w}/${h}">${v ? `<img src="${esc(v)}" alt="">` : '<span>لم تُرفع صورة</span>'}</div><div class="af-cr-info"></div>
-            <div class="af-cr-act"><label class="af-up">📁 ${v ? 'تغيير' : 'رفع صورة'}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>${v ? '<button type="button" class="af-rm" data-rm>🗑️</button>' : ''}</div></div>`; }).join('')}</div></div>`; }).join('') : '<p class="af-pv-n">اختر المساحات أولاً لتظهر خانات الصور.</p>';
+            <div class="af-cr-act"><button type="button" class="af-tpl" data-tpl title="تحميل نموذج فارغ بالمقاس الصحيح للتصميم عليه">⬇️ تحميل النموذج</button><label class="af-up">📁 ${v ? 'تغيير' : 'رفع صورة'}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>${v ? '<button type="button" class="af-rm" data-rm>🗑️</button>' : ''}</div></div>`; }).join('')}</div></div>`; }).join('') : '<p class="af-pv-n">اختر المساحات أولاً لتظهر خانات الصور.</p>';
       box.querySelectorAll('[data-pv]').forEach((b) => (b.onclick = () => preview(b.dataset.pv, slots.find((x) => x.slot === b.dataset.pv).t)));
-      box.querySelectorAll('.af-cr-tile').forEach((t) => { const { s, d: dv, w, h } = t.dataset; check(t, +w, +h);
-        t.querySelector('input[type=file]').onchange = (e) => { const fl = e.target.files[0]; if (!fl) return; if (fl.size > 1500000) return onErr?.('الحد الأقصى للصورة 1.5 ميغا');
-          const r = new FileReader(); r.onload = () => { (pend[s] ||= {})[dv] = r.result; draw(); }; r.readAsDataURL(fl); };
-        t.querySelector('[data-rm]')?.addEventListener('click', () => { (pend[s] ||= {})[dv] = ''; draw(); }); });
+      box.querySelectorAll('.af-cr-tile').forEach((t) => { const { s, d: dv, w, h } = t.dataset, key = s + dv, S = slots.find((x) => x.slot === s); check(t, +w, +h);
+        t.querySelector('[data-tpl]').onclick = () => template(S.t, Object.keys(S.dev).length === 1 ? 'كل الأجهزة' : DEV[dv].replace(/^\S+\s/, ''), +w, +h, `fntazya-${s}-${dv}-${w}x${h}.png`);
+        t.querySelector('input[type=file]').onchange = async (e) => { const fl = e.target.files[0]; e.target.value = ''; if (!fl) return;
+          const bad = (m) => { msgs[key] = '⛔ ' + m; onErr?.(`${S.t} (${DEV[dv] || ''}): ${m}`); draw(); };
+          if (fl.size > 1500000) return bad('حجم الملف أكبر من 1.5 ميغا');
+          const r = await inspect(fl); if (r.err) return bad(r.err);
+          if (r.cmyk) return bad('الصورة بألوان CMYK (للطباعة). احفظها بألوان RGB');
+          if (Math.abs(r.w - +w) > 5 || Math.abs(r.h - +h) > 5) return bad(`المقاس ${r.w}×${r.h} غير صحيح، المطلوب ${w}×${h} بكسل. حمّل النموذج وصمّم عليه`);
+          delete msgs[key]; onErr?.('');
+          const fr = new FileReader(); fr.onload = () => { (pend[s] ||= {})[dv] = fr.result; draw(); }; fr.readAsDataURL(fl); };
+        t.querySelector('[data-rm]')?.addEventListener('click', () => { (pend[s] ||= {})[dv] = ''; delete msgs[key]; draw(); }); });
     };
     draw();
     return { draw, value: () => { const o = {}; for (const s of getSel()) { const S = slots.find((x) => x.slot === s); o[s] = {}; for (const dv of Object.keys(S.dev)) o[s][dv] = val(s, dv); } return o; } };
@@ -112,5 +154,5 @@ const AdForm = (() => {
       ${(q.warnings || []).map((w) => `<p class="af-w">⚠️ ${esc(w)}</p>`).join('')}</div>`;
   }
 
-  return { preview, slotPicker, creatives, quoteHTML, money, fmt, esc };
+  return { preview, slotPicker, creatives, quoteHTML, money, fmt, esc, inspect, template };
 })();
