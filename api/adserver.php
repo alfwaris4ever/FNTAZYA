@@ -41,12 +41,13 @@ CREATE TABLE IF NOT EXISTS ad_pricing(slot TEXT PRIMARY KEY, cpm REAL, daily REA
 CREATE TABLE IF NOT EXISTS ad_settings(k TEXT PRIMARY KEY, v TEXT);
 CREATE TABLE IF NOT EXISTS advertisers(id INTEGER PRIMARY KEY, email TEXT UNIQUE, pass_hash TEXT, company TEXT, name TEXT, phone TEXT, created INTEGER, last_seen INTEGER, suspended INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS adv_tokens(token_hash TEXT PRIMARY KEY, adv_id INTEGER, created INTEGER);
+CREATE TABLE IF NOT EXISTS ad_devstats(cid INTEGER, slot TEXT, dev TEXT, impr INTEGER DEFAULT 0, clicks INTEGER DEFAULT 0, PRIMARY KEY(cid,slot,dev));
 CREATE TABLE IF NOT EXISTS adv_resets(token_hash TEXT PRIMARY KEY, adv_id INTEGER, created INTEGER);
 SQL);
   $cols = array_column(db()->query('PRAGMA table_info(ad_campaigns)')->fetchAll(), 'name');
   $add = ['creatives' => "TEXT DEFAULT ''", 'ctype' => "TEXT DEFAULT 'paid'", 'pricing' => "TEXT DEFAULT 'cpm'", 'price' => 'REAL DEFAULT 0',
     'adv_id' => 'INTEGER DEFAULT 0', 'note' => "TEXT DEFAULT ''", 'decided' => 'INTEGER DEFAULT 0',
-    'quote' => "TEXT DEFAULT ''", 'invoice_no' => "TEXT DEFAULT ''", 'invoice_date' => "TEXT DEFAULT ''", 'paid_at' => 'INTEGER DEFAULT 0', 'terms_at' => 'INTEGER DEFAULT 0'];
+    'quote' => "TEXT DEFAULT ''", 'invoice_no' => "TEXT DEFAULT ''", 'invoice_date' => "TEXT DEFAULT ''", 'paid_at' => 'INTEGER DEFAULT 0', 'terms_at' => 'INTEGER DEFAULT 0', 'refund' => 'REAL DEFAULT 0', 'ended_day' => "TEXT DEFAULT ''"];
   $firstFiller = !in_array('ctype', $cols, true);
   foreach ($add as $c => $def) if (!in_array($c, $cols, true)) db()->exec("ALTER TABLE ad_campaigns ADD COLUMN $c $def");
   // الإعلانات التجريبية تتحول إلى إعلانات رديفة
@@ -87,13 +88,61 @@ function requireAdmin(): array { $u = authUser(); if (!in_array($u['email'], ADM
 function campaignTotals(int $cid): array {
   $st = db()->prepare('SELECT COALESCE(SUM(impr),0) i, COALESCE(SUM(clicks),0) c FROM ad_stats WHERE cid=?'); $st->execute([$cid]); return $st->fetch();
 }
+/* مرات الظهور المحجوزة لكل مساحة على حدة */
+function slotDelivered(int $cid, string $slot): int {
+  static $cache = [];
+  if (!isset($cache[$cid])) { $st = db()->prepare('SELECT slot, SUM(impr) n FROM ad_stats WHERE cid=? GROUP BY slot'); $st->execute([$cid]); $cache[$cid] = array_map('intval', array_column($st->fetchAll(), 'n', 'slot')); }
+  return $cache[$cid][$slot] ?? 0;
+}
+function slotDone(array $c, string $slot): bool {
+  return ($c['ctype'] ?? 'paid') !== 'filler' && $c['pricing'] !== 'daily' && (int)$c['max_impr'] > 0 && slotDelivered((int)$c['id'], $slot) >= (int)$c['max_impr'];
+}
 function isLive(array $c): bool {
   $d = today();
   if ($c['status'] !== 'active') return false;
   if ($c['start'] && $d < $c['start']) return false;
   if ($c['end'] && $d > $c['end']) return false;
-  if (($c['ctype'] ?? 'paid') !== 'filler' && (int)$c['max_impr'] > 0 && (int)campaignTotals((int)$c['id'])['i'] >= (int)$c['max_impr']) return false;
+  if (($c['ctype'] ?? 'paid') !== 'filler' && $c['pricing'] !== 'daily' && (int)$c['max_impr'] > 0) {
+    foreach (explode(',', (string)$c['slots']) as $s) if (!slotDone($c, $s)) return true;
+    return false; // اكتملت مرات الظهور في كل المساحات
+  }
   return true;
+}
+/* رصيد الحملة: المستهلك والمتبقي (يشمل الضريبة بنفس نسبتها) */
+function balanceOf(array $c): array {
+  $price = (float)$c['price']; $q = json_decode((string)($c['quote'] ?? ''), true) ?: [];
+  $paid = in_array($c['status'], ['active', 'paused', 'ended'], true);
+  $out = ['paid' => $paid, 'price' => $price, 'consumed' => 0.0, 'remaining' => $price, 'refund' => (float)($c['refund'] ?? 0), 'slots' => []];
+  $lines = $q['lines'] ?? [];
+  $factor = !empty($q['subtotal']) ? $price / max(0.01, (float)$q['subtotal']) : 1; // يشمل الضريبة وأي تعديل يدوي للسعر
+  $stopDay = $c['status'] === 'ended' && $c['ended_day'] ? $c['ended_day'] : today();
+  $used = 0.0;
+  foreach ($lines as $l) {
+    $s = $l['slot'] ?? ''; if (!isset(AD_SLOTS[$s])) continue;
+    $del = slotDelivered((int)$c['id'], $s); $qty = (int)($l['qty'] ?? 0); $unit = (float)($l['unit'] ?? 0);
+    if (($q['pricing'] ?? $c['pricing']) === 'daily') {
+      $last = $c['end'] && $c['end'] < $stopDay ? $c['end'] : $stopDay;
+      $el = $paid && $c['start'] ? max(0, min($qty, dayDiff($c['start'], $last) + 1)) : 0;
+      $u = $el * $unit; $out['slots'][$s] = ['impr' => $del, 'days' => $qty, 'daysUsed' => $el, 'used' => round($u * $factor, 2), 'remaining' => round(($qty - $el) * $unit * $factor, 2)];
+    } else {
+      $d = $paid ? min($del, $qty) : 0; $u = $d / 1000 * $unit;
+      $out['slots'][$s] = ['impr' => $del, 'booked' => $qty, 'imprLeft' => max(0, $qty - $del), 'used' => round($u * $factor, 2), 'remaining' => round(($qty - $d) / 1000 * $unit * $factor, 2)];
+    }
+    $used += $u;
+  }
+  if ($paid) { $out['consumed'] = round(min($price, $used * $factor), 2); $out['remaining'] = round(max(0, $price - $out['consumed']), 2); }
+  if ($c['status'] === 'ended') $out['remaining'] = 0.0;
+  return $out;
+}
+function devStats(int $cid): array {
+  $st = db()->prepare('SELECT slot, dev, impr, clicks FROM ad_devstats WHERE cid=?'); $st->execute([$cid]); $o = [];
+  foreach ($st->fetchAll() as $r) $o[$r['slot']][$r['dev']] = ['impr' => (int)$r['impr'], 'clicks' => (int)$r['clicks']];
+  return $o;
+}
+function devStat(int $cid, string $slot, string $dev, string $col): void {
+  if (!in_array($dev, ['d', 't', 'm'], true)) return; $col = $col === 'clicks' ? 'clicks' : 'impr';
+  db()->prepare('INSERT OR IGNORE INTO ad_devstats(cid,slot,dev) VALUES(?,?,?)')->execute([$cid, $slot, $dev]);
+  db()->prepare("UPDATE ad_devstats SET $col=$col+1 WHERE cid=? AND slot=? AND dev=?")->execute([$cid, $slot, $dev]);
 }
 function advKey(array $c): string { return (int)($c['adv_id'] ?? 0) > 0 ? 'a' . (int)$c['adv_id'] : 'n' . substr(md5(mb_strtolower(trim((string)$c['advertiser']))), 0, 8); }
 
@@ -209,6 +258,9 @@ function advLimit(string $email): void {
 }
 function campaignRow(array $c): array {
   $t = campaignTotals((int)$c['id']); $c['impr'] = (int)$t['i']; $c['clicks'] = (int)$t['c']; $c['live'] = isLive($c);
+  if (($c['ctype'] ?? 'paid') !== 'filler') { $c['bal'] = balanceOf($c); $c['dev'] = devStats((int)$c['id']);
+    $st = db()->prepare('SELECT slot, SUM(impr) i, SUM(clicks) c FROM ad_stats WHERE cid=? GROUP BY slot'); $st->execute([$c['id']]);
+    $c['slotStats'] = []; foreach ($st->fetchAll() as $r) $c['slotStats'][$r['slot']] = ['impr' => (int)$r['i'], 'clicks' => (int)$r['c']]; }
   return $c;
 }
 function money($v, array $S): string { return number_format((float)$v, 2) . ' ' . $S['currency']; }
@@ -240,17 +292,23 @@ switch ($a) {
       $r = mt_rand() / mt_getrandmax() * $tot; foreach ($pool as $i => $c) { $r -= $ws[$i]; if ($r <= 0) return $c; } return end($pool);
     };
     $outS = [];
+    shuffle($want); // تبادل: المعلن الواحد يظهر مرة في هذه المساحة ومرة في تلك
+    // على الكمبيوتر: المربع الجانبي له الأولوية 70% مقابل 30% للبانر تحت اللعبة
+    if ((int)($_GET['w'] ?? 0) >= 1024 && in_array('game_side', $want, true) && in_array('game_below', $want, true)) {
+      $first = random_int(1, 100) <= 70 ? 'game_side' : 'game_below';
+      $want = array_values(array_merge([$first], array_diff($want, [$first])));
+    }
     foreach ($want as $slot) {
       $elig = array_filter($camps, function ($c) use ($slot, $cat) {
         if (!in_array($slot, explode(',', (string)$c['slots']), true)) return false;
         $cats = array_filter(explode(',', (string)$c['cats'])); return !$cats || in_array($cat, $cats, true);
       });
-      $paid = array_filter($elig, fn($c) => ($c['ctype'] ?? 'paid') !== 'filler' && !in_array(advKey($c), $used, true));
+      $paid = array_filter($elig, fn($c) => ($c['ctype'] ?? 'paid') !== 'filler' && !in_array(advKey($c), $used, true) && !slotDone($c, $slot));
       $excl = array_filter($paid, fn($c) => $c['pricing'] === 'daily');
       $c = null;
       if ($excl) $c = $pick(array_values($excl), fn($x) => 1);
-      elseif ($paid) $c = $pick(array_values($paid), function ($x) { // توزيع متساوٍ: المتبقي ÷ الأيام المتبقية
-        $rem = (int)$x['max_impr'] > 0 ? max(1, (int)$x['max_impr'] - (int)campaignTotals((int)$x['id'])['i']) : 1000;
+      elseif ($paid) $c = $pick(array_values($paid), function ($x) use ($slot) { // توزيع متساوٍ: المتبقي ÷ الأيام المتبقية
+        $rem = (int)$x['max_impr'] > 0 ? max(1, (int)$x['max_impr'] - slotDelivered((int)$x['id'], $slot)) : 1000;
         $left = $x['end'] ? max(1, dayDiff(today(), $x['end']) + 1) : 30;
         return $rem / $left * max(1, (int)$x['weight']);
       });
@@ -276,7 +334,7 @@ switch ($a) {
     $evs = array_slice(is_array($b['ev'] ?? null) ? $b['ev'] : [], 0, 30);
     $ids = array_map('intval', array_column(db()->query("SELECT id FROM ad_campaigns")->fetchAll(), 'id'));
     foreach ($evs as $e) { $cid = (int)($e['c'] ?? 0); $slot = (string)($e['s'] ?? '');
-      if (in_array($cid, $ids, true) && isset(AD_SLOTS[$slot])) adStat($cid, $slot, 'impr'); }
+      if (in_array($cid, $ids, true) && isset(AD_SLOTS[$slot])) { adStat($cid, $slot, 'impr'); devStat($cid, $slot, (string)($e['d'] ?? ''), 'impr'); } }
     out(['ok' => true]);
   }
 
@@ -284,7 +342,7 @@ switch ($a) {
     $cid = (int)($_GET['c'] ?? 0); $slot = (string)($_GET['s'] ?? '');
     $st = db()->prepare('SELECT link FROM ad_campaigns WHERE id=?'); $st->execute([$cid]); $link = (string)$st->fetchColumn();
     if (!$link) { header('Location: /'); exit; }
-    if (isset(AD_SLOTS[$slot])) adStat($cid, $slot, 'clicks');
+    if (isset(AD_SLOTS[$slot])) { adStat($cid, $slot, 'clicks'); devStat($cid, $slot, (string)($_GET['d'] ?? ''), 'clicks'); }
     header('Cache-Control: no-store'); header('Location: ' . $link, true, 302); exit;
   }
 
@@ -567,6 +625,20 @@ switch ($a) {
         "حملتك {$c['name']} تحتاج تعديلاً. السبب: $note. عدّلها من: $link"); } catch (Throwable $e) { error_log('reject mail: ' . $e->getMessage()); }
     }
     out(['ok' => true]);
+  }
+
+  case 'adm_ad_end': { // إيقاف نهائي وإرجاع الرصيد المتبقي للمعلن
+    requireAdmin(); $S = adSettings();
+    $id = (int)($b['id'] ?? 0); $note = mb_substr(trim(strip_tags((string)($b['note'] ?? ''))), 0, 500);
+    $st = db()->prepare("SELECT c.*, a.email adv_email, a.name adv_name FROM ad_campaigns c LEFT JOIN advertisers a ON a.id=c.adv_id WHERE c.id=? AND c.status IN ('active','paused') AND c.ctype='paid'"); $st->execute([$id]); $c = $st->fetch();
+    if (!$c) fail('الحملة غير موجودة أو ليست قيد التشغيل');
+    $bal = balanceOf($c); $refund = isset($b['refund']) && $b['refund'] !== '' ? max(0, min((float)$c['price'], (float)$b['refund'])) : $bal['remaining'];
+    db()->prepare("UPDATE ad_campaigns SET status='ended', refund=?, ended_day=?, note=?, decided=? WHERE id=?")->execute([$refund, today(), $note, time(), $id]);
+    if (!empty($c['adv_email'])) try { sendMail($c['adv_email'], 'إيقاف حملتك الإعلانية وإرجاع الرصيد - فنتازيا', 'تم إيقاف حملتك',
+      '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($c['adv_name']) . '،<br>تم إيقاف حملة <b>' . h($c['name']) . '</b>.' . ($note ? '<br>' . nl2br(h($note)) : '') . '</p>'
+      . '<table role="presentation" cellpadding="6" style="font-size:14px;background:#f8fafc;border-radius:12px;width:100%"><tr><td>قيمة الحملة</td><td>' . money($c['price'], $S) . '</td></tr><tr><td>المستهلك</td><td>' . money($bal['consumed'], $S) . '</td></tr><tr><td><b>المبلغ المسترد</b></td><td><b>' . money($refund, $S) . '</b></td></tr></table>'
+      . '<p style="font-size:14px">سيصلك المبلغ المسترد على حسابك البنكي، وتواصل معنا إن احتجت أي تفاصيل.</p>', "تم إيقاف حملتك {$c['name']}. المبلغ المسترد: " . money($refund, $S)); } catch (Throwable $e) { error_log('end mail: ' . $e->getMessage()); }
+    out(['ok' => true, 'refund' => $refund]);
   }
 
   case 'adm_ad_del': {
