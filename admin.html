@@ -24,7 +24,11 @@ button.sm{padding:4px 7px;margin:0 2px;background:#eef1ff;color:#1d2350;font-siz
 .toolbar{margin-bottom:12px;font-weight:700}button.sm.on{background:#5b3cff;color:#fff}
 .chart{background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(29,35,80,.08)}.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:700}.legend span[style*="--c"]::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--c);margin-inline-end:5px;vertical-align:-1px}
 .note{color:#64748b;font-size:13px;line-height:1.8}.chip{display:inline-block;background:#eef1ff;border-radius:99px;padding:1px 8px;font-size:12px;margin:1px}.sub{color:#64748b;font-size:12px}
-img.thumb{width:64px;height:32px;object-fit:cover;border-radius:6px;vertical-align:middle}
+img.thumb{width:88px;height:auto;max-height:60px;object-fit:contain;border-radius:6px;background:#f1f5f9;display:block}
+.camp b{display:block;margin-bottom:8px;font-size:15px}.thumbs{display:flex;flex-wrap:wrap;gap:8px;max-width:200px}
+.slots{display:flex;flex-direction:column;align-items:flex-start;gap:8px}.slots .chip{margin:0;padding:4px 10px;line-height:1.5}
+td.ctl{min-width:118px;max-width:124px;white-space:normal}td.ctl .sm,td.ctl a.sm{display:inline-block;margin:3px 2px}
+td{vertical-align:top}
 textarea{width:100%;font:13px/1.6 monospace;padding:8px;border-radius:10px;border:2px solid #e2e6ff;box-sizing:border-box}
 .modal{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto;z-index:50}
 .modal-card{background:#fff;border-radius:18px;padding:20px;width:min(760px,100%)}
@@ -83,7 +87,7 @@ function loginForm(note=''){app.innerHTML=`<div class="msg" style="max-width:380
   document.getElementById('li').onclick=()=>go('login');document.getElementById('rg').onclick=()=>go('register')}
 </script>
 <script src="js/ad-form.js?v=20261125b"></script>
-<script src="js/admin-ads.js?v=20261126a"></script>
+<script src="js/admin-ads.js?v=20261126b"></script>
 <script>addEventListener('hashchange',load);load()</script>
 </body>
 </html>

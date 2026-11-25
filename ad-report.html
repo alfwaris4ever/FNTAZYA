@@ -31,10 +31,10 @@ const fmt=n=>Number(n||0).toLocaleString('en-US'),ctr=(i,c)=>i?(c/i*100).toFixed
     const c=j.campaign,T=j.totals;
     R.innerHTML=`<h2>${esc(c.name)} <span class="st" style="background:${c.live?'#dcfce7':'#f1f5f9'}">${c.live?'🟢 تعمل الآن':c.status==='paused'?'⏸️ موقوفة':'⚪ منتهية'}</span></h2>
     <div class="note">المعلن: <b>${esc(c.advertiser)}</b> · الفترة: ${c.start||'—'} ← ${c.end||'مفتوحة'}</div>
-    <div class="cards"><div class="card"><b>${fmt(T.i)}</b><span>مشاهدة فعلية</span></div><div class="card"><b>${fmt(T.c)}</b><span>نقرة</span></div><div class="card"><b>${ctr(T.i,T.c)}</b><span>نسبة النقر CTR</span></div></div>
-    <h2>حسب المساحة</h2><table><tr><th>المساحة</th><th>مشاهدات</th><th>نقرات</th><th>CTR</th></tr>${j.slots.map(s=>`<tr><td>${esc(j.slotNames[s.slot]||s.slot)}</td><td>${fmt(s.impr)}</td><td>${fmt(s.clicks)}</td><td>${ctr(s.impr,s.clicks)}</td></tr>`).join('')||'<tr><td colspan=4>لا بيانات بعد</td></tr>'}</table>
-    <h2>يومياً</h2><table><tr><th>اليوم</th><th>مشاهدات</th><th>نقرات</th><th>CTR</th></tr>${j.daily.slice().reverse().map(d=>`<tr><td>${d.day}</td><td>${fmt(d.impr)}</td><td>${fmt(d.clicks)}</td><td>${ctr(d.impr,d.clicks)}</td></tr>`).join('')||'<tr><td colspan=4>لا بيانات بعد</td></tr>'}</table>
-    <p class="note">المشاهدة تُحسب فقط عند ظهور 50% على الأقل من الإعلان على الشاشة لمدة ثانية كاملة (معيار IAB)، والنقرة تُحسب عند الضغط على الإعلان. فنتازيا لا تجمع أي بيانات شخصية عن الأطفال.</p>`}
+    <div class="cards"><div class="card"><b>${fmt(T.i)}</b><span>مشاهدة فعلية</span></div><div class="card"><b>${fmt(T.c)}</b><span>نقرة</span></div><div class="card"><b>${ctr(T.i,T.c)}</b><span>نسبة النقر</span></div></div>
+    <h2>حسب المساحة</h2><table><tr><th>المساحة</th><th>مشاهدات</th><th>نقرات</th><th>نسبة النقر</th></tr>${j.slots.map(s=>`<tr><td>${esc(j.slotNames[s.slot]||s.slot)}</td><td>${fmt(s.impr)}</td><td>${fmt(s.clicks)}</td><td>${ctr(s.impr,s.clicks)}</td></tr>`).join('')||'<tr><td colspan=4>لا بيانات بعد</td></tr>'}</table>
+    <h2>يومياً</h2><table><tr><th>اليوم</th><th>مشاهدات</th><th>نقرات</th><th>نسبة النقر</th></tr>${j.daily.slice().reverse().map(d=>`<tr><td>${d.day}</td><td>${fmt(d.impr)}</td><td>${fmt(d.clicks)}</td><td>${ctr(d.impr,d.clicks)}</td></tr>`).join('')||'<tr><td colspan=4>لا بيانات بعد</td></tr>'}</table>
+    <p class="note">المشاهدة تُحسب فقط عند ظهور 50% على الأقل من الإعلان على الشاشة لمدة ثانية كاملة (المعيار العالمي لقياس الإعلانات)، والنقرة تُحسب عند الضغط على الإعلان. فنتازيا لا تجمع أي بيانات شخصية عن الأطفال.</p>`}
   catch(e){R.innerHTML=`<div class="msg">${esc(e.message||'تعذّر تحميل التقرير')}</div>`}})();
 </script>
 </body>
