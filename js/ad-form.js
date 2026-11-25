@@ -12,13 +12,15 @@ const AdForm = (() => {
     const s = document.createElement('style'); s.id = 'adform-css';
     s.textContent = `
 .af-slots{display:flex;flex-direction:column;gap:8px}
-.af-slot{display:flex;align-items:center;gap:12px;padding:10px 12px;border:2px solid #e2e6ff;border-radius:14px;background:#fff;cursor:pointer;transition:.15s}
+.af-slot{display:flex;align-items:center;gap:12px;padding:10px 12px;border:2px solid #e2e6ff;border-radius:14px;background:#fff;transition:.15s}
+.af-slots label.af-l{flex:1;display:flex!important;flex-direction:row!important;align-items:center;gap:12px;cursor:pointer;margin:0;min-width:0}
+.af-cr-act label.af-up{display:inline-block!important;flex-direction:row!important}
 .af-slot:hover{border-color:#c7d2fe}.af-slot.on{border-color:#5b3cff;background:#f5f3ff}
 .af-slot input{width:20px;height:20px;accent-color:#5b3cff;flex:none;margin:0}
 .af-slot .af-m{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}.af-slot .af-m b{font-size:15px}.af-slot .af-m small{color:#64748b;font-size:12px}
 .af-slot .af-p{font-size:12px;color:#5b3cff;font-weight:700;white-space:nowrap;text-align:end}
 .af-eye{flex:none;font:inherit;font-weight:700;font-size:13px;border:0;border-radius:10px;padding:7px 12px;background:#eef1ff;color:#1d2350;cursor:pointer;white-space:nowrap}.af-eye:hover{background:#dfe4ff}
-@media(max-width:560px){.af-slot{flex-wrap:wrap}.af-slot .af-p{width:100%;text-align:start;padding-inline-start:32px}}
+@media(max-width:560px){.af-slot{flex-wrap:wrap}.af-slots label.af-l{flex-wrap:wrap}.af-slot .af-p{width:100%;text-align:start;padding-inline-start:32px}.af-eye{width:100%}}
 .af-pv{position:fixed;inset:0;z-index:100;background:rgba(15,23,42,.65);display:flex;align-items:center;justify-content:center;padding:16px}
 .af-pv-c{background:#fff;border-radius:20px;padding:16px;width:min(980px,100%);max-height:94vh;display:flex;flex-direction:column;gap:10px}
 .af-pv-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.af-pv-h h3{margin:0;flex:1;font-size:18px}
@@ -58,11 +60,11 @@ const AdForm = (() => {
   function slotPicker(box, slots, selected, opt = {}) {
     css();
     const cur = opt.currency || 'ر.س';
-    box.innerHTML = `<div class="af-slots">${slots.map((s) => `<label class="af-slot${selected.includes(s.slot) ? ' on' : ''}">
+    box.innerHTML = `<div class="af-slots">${slots.map((s) => `<div class="af-slot${selected.includes(s.slot) ? ' on' : ''}"><label class="af-l">
       <input type="checkbox" name="slots" value="${s.slot}"${selected.includes(s.slot) ? ' checked' : ''}>
       <span class="af-m"><b>${esc(s.t)}</b><small dir="rtl">${esc(s.size)}</small></span>
-      ${opt.showPrice && s.price ? `<span class="af-p">${s.price.cpm_on ? `${money(s.price.cpm, cur)} / 1000 ظهور` : ''}${s.price.cpm_on && s.price.daily_on ? '<br>' : ''}${s.price.daily_on ? `${money(s.price.daily, cur)} / يوم حصري` : ''}</span>` : ''}
-      <button type="button" class="af-eye" data-pv="${s.slot}">👁️ مشاهدة موقع الإعلان</button></label>`).join('')}</div>`;
+      ${opt.showPrice && s.price ? `<span class="af-p">${s.price.cpm_on ? `${money(s.price.cpm, cur)} / 1000 ظهور` : ''}${s.price.cpm_on && s.price.daily_on ? '<br>' : ''}${s.price.daily_on ? `${money(s.price.daily, cur)} / يوم حصري` : ''}</span>` : ''}</label>
+      <button type="button" class="af-eye" data-pv="${s.slot}">👁️ مشاهدة موقع الإعلان</button></div>`).join('')}</div>`;
     box.querySelectorAll('[data-pv]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); preview(b.dataset.pv, slots.find((s) => s.slot === b.dataset.pv).t); }));
     box.querySelectorAll('input[name=slots]').forEach((i) => i.addEventListener('change', () => { i.closest('.af-slot').classList.toggle('on', i.checked); opt.onChange?.(); }));
     return () => [...box.querySelectorAll('input[name=slots]:checked')].map((x) => x.value);
