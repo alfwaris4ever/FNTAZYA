@@ -1,7 +1,7 @@
 /* فنتازيا: دوال وبيانات مشتركة تستخدمها أكثر من لعبة. تعديل أي شيء هنا يؤثر على عدة ألعاب. */
 /* أسئلة: عدد الأسئلة يزيد من 5 إلى 10، والمؤقت يبدأ من الدرجة 9 ويقصر تدريجياً */
 /* ---------- أسئلة الاختيار على شكل سباق سيارات: السؤال فوق، وكل إجابة لوحة فوق مسار، واللاعب يوجّه السيارة لمسار الإجابة قبل وصول اللوحات ---------- */
-/* secs (اختياري): وقت كل سؤال بالثواني. بدونه: سهل 6، وسط 5، صعب 4.5 ثانية */
+/* secs (اختياري): وقت كل سؤال بالثواني. بدونه: سهل 5، وسط 4، صعب 3 ثواني */
 /* بيئات السباق: الإسفلت ثابت (رمادي غامق) في كل البيئات، والمتغير هو السماء والأرض والخلفية وما على جانبي الطريق */
 const DRV_ENVS=[
   {n:'صحراء',sky:['#4f9de8','#fde7a8'],g:['#f0cb80','#e3b562'],far:'dunes',fc:['#e7b65f','#d39a45'],pole:'marker',curb:'#f97316',near:['🌵','🪨','🌾','🌵'],big:['🌴','🌴','🐪','🌵','🏜️','🌴','🐫']},
@@ -14,12 +14,34 @@ const DRV_ENVS=[
   {n:'خريف',sky:['#f59e5b','#fff1d6'],g:['#e9a55c','#dc914a'],far:'mountains',fc:['#b45f3a','#8c4328'],pole:'fence',curb:'#dc2626',near:['🍂','🍁','🍄','🍂'],big:['🍁','🌳','🎃','🏡','🦊','🍁']},
 ];
 const DRV_CARS=['#ef4444','#3b82f6','#facc15','#22c55e','#f97316','#a855f7','#ec4899','#f1f5f9'];
+/* صور الإيموجي تُرسم مرة واحدة ثم تُنسخ كصورة في كل إطار (أسرع بكثير من رسم النص كل مرة) */
+const DRV_SPR=new Map();const drvSpr=e=>{let s=DRV_SPR.get(e);if(!s){s=document.createElement('canvas');s.width=s.height=160;const k=s.getContext('2d');k.font='120px serif';k.textAlign='center';k.textBaseline='middle';k.fillText(e,80,84);DRV_SPR.set(e,s)}return s};
+/* أصوات السباق مولّدة بالكامل داخل اللعبة (بلا ملفات): محرك بتغيير نمر، صوت الطريق، بوري، وصوت تغيير المسار */
+function drvAudio(){if(!sound.on)return null;try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();actx.resume?.()}catch(e){return null}
+  const A=actx,now=()=>A.currentTime,out=A.createGain();out.gain.value=0;out.connect(A.destination);
+  const o1=A.createOscillator(),o2=A.createOscillator(),lp=A.createBiquadFilter(),eg=A.createGain();o1.type='sawtooth';o2.type='square';lp.type='lowpass';lp.Q.value=4;eg.gain.value=.05;const o2g=A.createGain();o2g.gain.value=.45;
+  o1.connect(lp);o2.connect(o2g).connect(lp);lp.connect(eg).connect(out);
+  const nb=A.createBuffer(1,A.sampleRate*2,A.sampleRate),ch=nb.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=Math.random()*2-1;
+  const ns=A.createBufferSource();ns.buffer=nb;ns.loop=true;const bp=A.createBiquadFilter();bp.type='bandpass';bp.frequency.value=380;bp.Q.value=.6;const rg=A.createGain();rg.gain.value=.03;ns.connect(bp).connect(rg).connect(out);
+  o1.start();o2.start();ns.start();out.gain.setTargetAtTime(1,now(),.3);
+  let gear=1,rpm=.3,stopped=false;
+  const burst=(f,d,v,type='highpass')=>{const s=A.createBufferSource();s.buffer=nb;const fl=A.createBiquadFilter();fl.type=type;fl.frequency.value=f;const g=A.createGain();g.gain.setValueAtTime(v,now());g.gain.exponentialRampToValueAtTime(.001,now()+d);s.connect(fl).connect(g).connect(A.destination);s.start();s.stop(now()+d)};
+  const api={
+    update(dt,on){if(stopped)return;out.gain.setTargetAtTime(on?1:0,now(),.08);if(!on)return;
+      /* المحرك يرفع الدورات ثم يغيّر النمرة، حتى النمرة الخامسة ثم يثبت مع تموج خفيف */
+      if(gear<5){rpm+=dt*(.55/gear);if(rpm>=1){gear++;rpm=.55;api.shift()}}else rpm=.78+Math.sin(now()*1.7)*.04;
+      const f=38+rpm*70+gear*6;o1.frequency.setTargetAtTime(f,now(),.05);o2.frequency.setTargetAtTime(f/2,now(),.05);lp.frequency.setTargetAtTime(380+rpm*1100,now(),.05)},
+    shift(){eg.gain.cancelScheduledValues(now());eg.gain.setValueAtTime(.05,now());eg.gain.linearRampToValueAtTime(.012,now()+.06);eg.gain.linearRampToValueAtTime(.05,now()+.22);burst(2500,.05,.05)},
+    horn(n=2){if(!sound.on)return;for(let i=0;i<n;i++){const t=now()+i*.22;[392,494].forEach(fq=>{const o=A.createOscillator(),g=A.createGain(),f2=A.createBiquadFilter();o.type='square';o.frequency.value=fq;f2.type='lowpass';f2.frequency.value=1800;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.05,t+.02);g.gain.setValueAtTime(.05,t+.14);g.gain.linearRampToValueAtTime(0,t+.17);o.connect(f2).connect(g).connect(A.destination);o.start(t);o.stop(t+.2)})}},
+    whoosh(){if(sound.on)burst(900,.18,.06,'bandpass')},
+    stop(){if(stopped)return;stopped=true;out.gain.setTargetAtTime(0,now(),.05);setTimeout(()=>{try{o1.stop();o2.stop();ns.stop();out.disconnect()}catch(e){}},400)}};
+  return api}
 const drvShade=(hex,a)=>{const v=parseInt(hex.slice(1),16),f=u=>Math.max(0,Math.min(255,Math.round(a<0?u*(1+a):u+(255-u)*a)));return '#'+[(v>>16)&255,(v>>8)&255,v&255].map(f).map(u=>u.toString(16).padStart(2,'0')).join('')};
 function quiz(root,c,{make,secs}){
-  const total=c.fi(5,10),driveT=secs!=null?secs:[6,5,4.5][c.run.diff],ENV=DRV_ENVS[rnd(0,DRV_ENVS.length-1)],CAR=DRV_CARS[rnd(0,DRV_CARS.length-1)];
+  const total=c.fi(5,10),driveT=secs!=null?secs:[5,4,3][c.run.diff],ENV=DRV_ENVS[rnd(0,DRV_ENVS.length-1)],CAR=DRV_CARS[rnd(0,DRV_CARS.length-1)];
   /* عالم ثلاثي الأبعاد مبسّط: R نصف عرض الطريق، d بُعد الشيء عن الكاميرا، والسيارة عند d=1. الطريق يتحرك بسرعة ثابتة طول اللعبة */
-  const R=1,DS=26,DF=70,DA=1.4,V=(DS-DA)/driveT,DK=10,GH=1.05;
-  let q=0,score=0,lock=true,cur=null,n=3,lane=1,carX=null,signs=[],dead=false,t0=performance.now(),res=null,shake=0,S=0,gw=null,g=0,last=null,ansAt=0;
+  const R=1,DS=16,DF=70,DA=1.4,V=(DS-DA)/driveT,DK=8.5,GH=1.05;
+  let q=0,score=0,lock=true,cur=null,n=3,lane=1,carX=null,signs=[],dead=false,t0=performance.now(),res=null,shake=0,S=0,gw=null,g=0,last=null,ansAt=0,G=null,geoN=0,bw=100;const au=drvAudio();
   root.innerHTML=`<style>
     .drv-cv{position:absolute;inset:0;width:100%;height:100%;display:block}
     .drv-q{position:absolute;top:calc(var(--hud,58px) + 2px);left:50%;translate:-50% 0;z-index:4;background:#fff;color:#1d2350;border-radius:22px;padding:6px 18px 8px;text-align:center;box-shadow:0 6px 0 rgba(29,35,80,.18),0 10px 24px rgba(0,0,0,.12);max-width:92%;min-width:min(260px,80%);font:800 clamp(24px,7cqmin,46px) system-ui,Tahoma,sans-serif;line-height:1.2}
@@ -28,16 +50,18 @@ function quiz(root,c,{make,secs}){
     #stage .drv-q,#stage .drv-q *{color:#1d2350!important;text-shadow:none!important;opacity:1!important}#stage .drv-q .big-letter,#stage .drv-q .big-pic{color:#5b3cff!important}#stage .drv-q .q-hint{color:#555b85!important}
     #stage .hud .pill{background:rgba(29,35,80,.78)!important;color:#fff!important}#stage .hud .pill b{color:#facc15!important}
     .drv-signs{position:absolute;inset:0;z-index:3;pointer-events:none}
-    .drv-sign{position:absolute;translate:-50% 0;pointer-events:auto;cursor:pointer;background:linear-gradient(#1fa855,#11793a);color:#fff;border:3px solid #fff;border-radius:12px;box-shadow:0 0 0 2px #0b5a2b,0 6px 12px rgba(0,0,0,.3);display:grid;place-items:center;text-align:center;font-weight:900;line-height:1.1;padding:.25em .2em;overflow:hidden;text-shadow:0 2px 0 rgba(0,0,0,.25)}
+    .drv-sign{position:absolute;left:0;top:0;transform-origin:50% 0;will-change:transform,opacity;pointer-events:auto;cursor:pointer;background:linear-gradient(#1fa855,#11793a);color:#fff;border:3px solid #fff;border-radius:12px;box-shadow:0 0 0 2px #0b5a2b,0 6px 12px rgba(0,0,0,.3);display:grid;place-items:center;text-align:center;font-weight:900;line-height:1.1;padding:.25em .2em;overflow:hidden;text-shadow:0 2px 0 rgba(0,0,0,.25)}
     .drv-sign::after{content:"⬇";display:block;font-size:.55em;opacity:.9}
     .drv-sign .pic{font-size:1.5em;line-height:1}.drv-sign .cap{display:none;font-size:.55em}.drv-sign.show-cap .cap{display:block}.drv-sign .ltr-choice{font-size:1.3em}
     .drv-sign.mine{outline:4px solid #facc15;outline-offset:2px}
-    .drv-sign.ok{background:linear-gradient(#4ade80,#16a34a);outline:5px solid #fff;animation:pop .35s}.drv-sign.bad{background:linear-gradient(#f87171,#b91c1c);animation:shake .4s}
+    .drv-sign.ok{background:linear-gradient(#4ade80,#16a34a);outline:5px solid #fff}.drv-sign.bad{background:linear-gradient(#f87171,#b91c1c);outline:5px solid #fecaca}
   </style><canvas class="drv-cv"></canvas><div class="drv-signs"></div><div class="hud">${c.tag}<span class="pill">❓ <b class="qn">0</b> من ${total}</span><span class="pill">⭐ <b class="sc">0</b></span></div><div class="drv-q"></div><div class="tbar" role="progressbar" aria-label="الوقت المتبقي"><i></i></div>`;
   const cv=root.querySelector('.drv-cv'),x=cv.getContext('2d'),$q=root.querySelector('.drv-q'),$s=root.querySelector('.drv-signs'),bar=root.querySelector('.tbar'),fill=bar.firstElementChild;
-  let W=0,H=0,dpr=1;const size=()=>{const r=root.getBoundingClientRect();W=r.width;H=r.height;dpr=Math.min(2,devicePixelRatio||1);cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr)};size();c.on(window,'resize',size);
+  let W=0,H=0,dpr=1;const size=()=>{const r=root.getBoundingClientRect();W=r.width;H=r.height;dpr=Math.min(2,devicePixelRatio||1);cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);geoN=0;signBase()};size();c.on(window,'resize',size);
+  /* مقاس اللوحات الأساسي يُحسب مرة لكل سؤال، والحركة بعدها بالتحريك والتكبير فقط (سلس وخفيف على الجهاز) */
+  function signBase(){if(!signs.length)return;bw=Math.max(40,W*.94/n-8);signs.forEach(s=>{const el=s.el,Lc=[...el.textContent.trim()].length||2;el.style.width=bw+'px';el.style.minHeight=(bw*.42)+'px';el.style.fontSize=Math.max(12,Math.min(46,bw*.2,bw/(Math.max(2,Lc)*.62)))+'px'})}
   const geo=()=>{const qb=$q.getBoundingClientRect(),rr=root.getBoundingClientRect(),qB=qb.bottom-rr.top,hy=Math.max(H*.3,qB+H*.1),yc=H-30-Math.min(50,H*.06),hw=Math.min(W*.5,(yc-hy)*2.1);return{hy,yc,hw,qB}};
-  let G=null;const Py=d=>G.hy+(G.yc-G.hy)/d,Ps=d=>G.hw/d,PX=(X,d)=>W/2+X*G.hw/d,LXw=i=>-R+2*R*(i+.5)/n;
+  const Py=d=>G.hy+(G.yc-G.hy)/d,Ps=d=>G.hw/d,PX=(X,d)=>W/2+X*G.hw/d,LXw=i=>-R+2*R*(i+.5)/n;
   const quad=(Xa,Xb,da,db)=>{const ya=Py(da),yb=Py(db),sa=Ps(da),sb=Ps(db);x.beginPath();x.moveTo(W/2+Xa*sa,ya);x.lineTo(W/2+Xb*sa,ya);x.lineTo(W/2+Xb*sb,yb);x.lineTo(W/2+Xa*sb,yb);x.closePath();x.fill()};
   const dB=()=>Math.max(.2,(G.yc-G.hy)/(H-G.hy+4));
   /* شرائح تتكرر على طول الطريق (خطوط المسارات، الرصيف، أشرطة الأرض) وكلها تتحرك مع نفس S فتبقى متطابقة */
@@ -48,36 +72,44 @@ function quiz(root,c,{make,secs}){
   /* أشياء جانبي الطريق: كبيرة بعيدة (أشجار، بيوت، حيوانات) وصغيرة قريبة من الرصيف */
   const objs=[];const spawn=(o,w)=>{const side=Math.random()<.5?-1:1,bg=Math.random()<.62;o.w=w;o.X=side*(bg?R+.75+Math.random()*2.8:R+.42+Math.random()*.45);o.e=bg?ENV.big[rnd(0,ENV.big.length-1)]:ENV.near[rnd(0,ENV.near.length-1)];o.k=bg?.95+Math.random()*.7:.38+Math.random()*.2;return o};
   for(let i=0;i<40;i++)objs.push(spawn({},.6+Math.random()*48));
-  function setLane(i){if(lock&&g>=1)return;lane=Math.max(0,Math.min(n-1,i));signs.forEach((s,k)=>s.el.classList.toggle('mine',k===lane));beep(620,.04,'triangle',.06)}
+  function setLane(i){if(lock&&g>=1)return;const nl=Math.max(0,Math.min(n-1,i));if(nl!==lane&&cur)au?.whoosh();lane=nl;signs.forEach((s,k)=>s.el.classList.toggle('mine',k===lane))}
   c.on(window,'keydown',e=>{if(c.paused)return;if(e.key==='ArrowLeft'||e.key==='a'){e.preventDefault();setLane(lane-1)}else if(e.key==='ArrowRight'||e.key==='d'){e.preventDefault();setLane(lane+1)}
     else{const d=parseInt(e.key,10);if(d>=1&&d<=n){e.preventDefault();setLane(d-1)}}});
   let sx=null;c.on(cv,'pointerdown',e=>{sx=e.clientX});c.on(cv,'pointerup',e=>{if(sx==null)return;const dx=e.clientX-sx,r=cv.getBoundingClientRect();sx=null;
     if(Math.abs(dx)>25)setLane(lane+(dx>0?1:-1));else setLane(lane+(e.clientX-r.left<carX?-1:1))});
   function answer(i){lock=true;ansAt=performance.now();const s=signs[i],ok=!!s?.ok,okS=signs.find(z=>z.ok);
     if(ok){s.el.classList.add('ok');score++;root.querySelector('.sc').textContent=score;sfx.good();cur.onOk?.();res={t:'+1',col:'#16a34a',a:performance.now()}}
-    else{s?.el.classList.add('bad');okS?.el.classList.add('ok');sfx.bad();shake=.5;res={t:'✗',col:'#dc2626',a:performance.now()}}
+    else{s?.el.classList.add('bad');okS?.el.classList.add('ok');sfx.bad();au?.horn(1);shake=.5;res={t:'✗',col:'#dc2626',a:performance.now()}}
     cur.onAnswer?.(okS?.el);c.after(next,cur.delay||1300)}
   /* السؤال التالي: البوابة الجديدة تظهر من بعيد والطريق مستمر بلا توقف، والسيارة تبقى في مسارها */
-  function next(){if(q>=total){dead=true;return c.win(score*10,score===total?'كل إجاباتك صحيحة! 🌟':(total-score===1?'أخطأت في سؤال واحد':total-score===2?'أخطأت في سؤالين':`أخطأت في ${total-score} أسئلة`),{got:score,total,perfect:score===total,label:'إجابات صحيحة'})}
+  function next(){if(q>=total){dead=true;au?.stop();return c.win(score*10,score===total?'كل إجاباتك صحيحة! 🌟':(total-score===1?'أخطأت في سؤال واحد':total-score===2?'أخطأت في سؤالين':`أخطأت في ${total-score} أسئلة`),{got:score,total,perfect:score===total,label:'إجابات صحيحة'})}
     q++;root.querySelector('.qn').textContent=q;cur=make();$q.innerHTML=cur.q;const ch=shuffle(cur.choices),pn=n;n=ch.length;$s.innerHTML='';
     signs=ch.map((o,k)=>{const el=h(`<div class="drv-sign"${o.ok?' data-ok':''}>${o.html}</div>`);el.onpointerdown=e=>{e.stopPropagation();setLane(k)};el.style.display='none';$s.append(el);return{el,ok:o.ok}});
-    if(q===1||n!==pn)lane=Math.floor((n-1)/2);else lane=Math.min(lane,n-1);setLane(lane);gw=S+DS;g=0;res=null;lock=false;ansAt=0;cur.onShow?.()}
-  /* السيارة من الخلف */
-  function car(X,Yb,s,t,tilt){x.save();x.translate(X+(shake>0?Math.sin(t*60)*6*shake:0),Yb+Math.sin(t*16)*1.2);x.scale(s,s);x.rotate(tilt);
-    const body=x.createLinearGradient(0,-100,0,-10);body.addColorStop(0,drvShade(CAR,.35));body.addColorStop(.55,CAR);body.addColorStop(1,drvShade(CAR,-.3));
-    x.fillStyle='rgba(0,0,0,.32)';x.beginPath();x.ellipse(0,0,74,11,0,0,7);x.fill();
-    x.fillStyle='#111827';x.beginPath();x.roundRect(-60,-30,22,30,6);x.roundRect(38,-30,22,30,6);x.fill();
-    x.fillStyle=drvShade(CAR,-.15);x.beginPath();x.moveTo(-44,-60);x.lineTo(-34,-94);x.quadraticCurveTo(-31,-100,-24,-100);x.lineTo(24,-100);x.quadraticCurveTo(31,-100,34,-94);x.lineTo(44,-60);x.closePath();x.fill();
-    const gl=x.createLinearGradient(0,-96,0,-64);gl.addColorStop(0,'#1e3a5f');gl.addColorStop(1,'#5aa9e6');x.fillStyle=gl;x.beginPath();x.moveTo(-38,-64);x.lineTo(-30,-92);x.lineTo(30,-92);x.lineTo(38,-64);x.closePath();x.fill();
-    x.fillStyle='rgba(255,255,255,.35)';x.beginPath();x.moveTo(-24,-90);x.lineTo(-14,-90);x.lineTo(-24,-66);x.lineTo(-32,-66);x.closePath();x.fill();
-    x.fillStyle=body;x.beginPath();x.roundRect(-64,-64,128,48,16);x.fill();x.strokeStyle='rgba(255,255,255,.45)';x.lineWidth=2;x.beginPath();x.moveTo(-54,-61);x.lineTo(54,-61);x.stroke();
-    x.fillStyle='#1f2937';x.beginPath();x.roundRect(-62,-72,124,7,3);x.fill();x.fillRect(-44,-66,6,5);x.fillRect(38,-66,6,5);
-    x.save();x.shadowColor='#ff3b3b';x.shadowBlur=12;x.fillStyle='#ef4444';x.beginPath();x.roundRect(-58,-54,26,11,4);x.roundRect(32,-54,26,11,4);x.fill();x.restore();
-    x.fillStyle='#fecaca';x.fillRect(-54,-52,8,4);x.fillRect(46,-52,8,4);
-    x.fillStyle='rgba(17,24,39,.75)';x.beginPath();x.roundRect(-62,-24,124,10,5);x.fill();
-    x.fillStyle='#fff';x.beginPath();x.roundRect(-20,-44,40,15,3);x.fill();x.strokeStyle='#1d2350';x.lineWidth=1.2;x.stroke();
-    x.fillStyle='#1d2350';x.font='800 10px system-ui';x.textAlign='center';x.textBaseline='middle';x.fillText('فنتازيا',0,-36);
-    x.fillStyle='#6b7280';x.beginPath();x.arc(-30,-14,4,0,7);x.arc(30,-14,4,0,7);x.fill();x.restore()}
+    signBase();geoN=0;if(q===1||n!==pn)lane=Math.floor((n-1)/2);else lane=Math.min(lane,n-1);setLane(lane);if(q===1)au?.horn(2);gw=S+DS;g=0;res=null;lock=false;ansAt=0;cur.onShow?.()}
+  /* سيارة رياضية من الخلف: عريضة ومنخفضة، جناح خلفي، شريط إضاءة خلفي، خطوط سباق، ناشر هواء وأربع عوادم */
+  const STR=['#f1f5f9','#facc15'].includes(CAR)?'#1f2937':'#ffffff';
+  function car(X,Yb,s,t,tilt){x.save();x.translate(X+(shake>0?Math.sin(t*60)*6*shake:0),Yb+Math.sin(t*22)*.5);x.scale(s,s);x.rotate(tilt);
+    const body=x.createLinearGradient(0,-82,0,-8);body.addColorStop(0,drvShade(CAR,.4));body.addColorStop(.45,CAR);body.addColorStop(1,drvShade(CAR,-.35));
+    x.fillStyle='rgba(0,0,0,.35)';x.beginPath();x.ellipse(0,0,86,10,0,0,7);x.fill();
+    /* الإطارات العريضة */
+    x.fillStyle='#0b0f17';x.beginPath();x.roundRect(-78,-30,28,30,7);x.roundRect(50,-30,28,30,7);x.fill();x.strokeStyle='#2b3240';x.lineWidth=2;for(const sx of[-64,64])for(let i=-24;i<-2;i+=6){x.beginPath();x.moveTo(sx-10,i);x.lineTo(sx+10,i);x.stroke()}
+    /* الجسم السفلي: أعرض من تحت وأكتاف منحنية */
+    x.fillStyle=body;x.beginPath();x.moveTo(-74,-14);x.lineTo(-76,-40);x.quadraticCurveTo(-74,-58,-56,-62);x.lineTo(56,-62);x.quadraticCurveTo(74,-58,76,-40);x.lineTo(74,-14);x.quadraticCurveTo(72,-8,64,-8);x.lineTo(-64,-8);x.quadraticCurveTo(-72,-8,-74,-14);x.closePath();x.fill();
+    /* المقصورة المنخفضة المائلة */
+    x.fillStyle=drvShade(CAR,-.12);x.beginPath();x.moveTo(-46,-60);x.quadraticCurveTo(-40,-84,-24,-88);x.lineTo(24,-88);x.quadraticCurveTo(40,-84,46,-60);x.closePath();x.fill();
+    const gl=x.createLinearGradient(0,-86,0,-62);gl.addColorStop(0,'#0f172a');gl.addColorStop(1,'#3b6ea5');x.fillStyle=gl;x.beginPath();x.moveTo(-38,-63);x.quadraticCurveTo(-33,-80,-21,-83);x.lineTo(21,-83);x.quadraticCurveTo(33,-80,38,-63);x.closePath();x.fill();
+    x.fillStyle='rgba(255,255,255,.28)';x.beginPath();x.moveTo(-20,-82);x.lineTo(-11,-82);x.lineTo(-24,-64);x.lineTo(-32,-64);x.closePath();x.fill();
+    /* خطوط السباق */
+    x.fillStyle=STR;x.globalAlpha=.9;x.fillRect(-15,-88,9,26);x.fillRect(6,-88,9,26);x.fillRect(-15,-60,9,22);x.fillRect(6,-60,9,22);x.globalAlpha=1;
+    /* الجناح الخلفي */
+    x.fillStyle='#111827';x.fillRect(-44,-74,5,14);x.fillRect(39,-74,5,14);x.beginPath();x.roundRect(-70,-80,140,8,3);x.fill();x.fillStyle='#374151';x.fillRect(-70,-80,140,2);x.fillStyle='#111827';x.fillRect(-72,-84,6,16);x.fillRect(66,-84,6,16);
+    /* شريط الإضاءة الخلفي */
+    x.save();x.shadowColor='#ff2a2a';x.shadowBlur=14;x.fillStyle='#ef4444';x.beginPath();x.roundRect(-70,-52,140,7,3);x.fill();x.restore();x.fillStyle='#fecaca';x.fillRect(-66,-50,22,3);x.fillRect(44,-50,22,3);
+    x.strokeStyle='rgba(0,0,0,.25)';x.lineWidth=1.5;x.beginPath();x.moveTo(-60,-38);x.lineTo(60,-38);x.stroke();
+    /* ناشر الهواء والعوادم */
+    x.fillStyle='#111827';x.beginPath();x.roundRect(-62,-24,124,16,5);x.fill();x.strokeStyle='#374151';x.lineWidth=2;for(let i=-36;i<=36;i+=12){x.beginPath();x.moveTo(i,-22);x.lineTo(i,-10);x.stroke()}
+    for(const ex of[-50,-38,38,50]){x.fillStyle='#cbd5e1';x.beginPath();x.arc(ex,-14,5,0,7);x.fill();x.fillStyle='#0b0f17';x.beginPath();x.arc(ex,-14,3,0,7);x.fill()}
+    x.restore()}
   /* الخلفية البعيدة: كثبان، تلال، جبال بقمم ثلجية، مباني المدينة، أو البحر */
   function drawFar(){const hy=G.hy,f=ENV.far,c1=ENV.fc[0],c2=ENV.fc[1];
     if(f==='sea'){const sg=x.createLinearGradient(0,hy,0,hy+H*.06);sg.addColorStop(0,c2);sg.addColorStop(1,c1);x.fillStyle=sg;x.fillRect(0,hy-H*.012,W,H*.07);
@@ -95,11 +127,11 @@ function quiz(root,c,{make,secs}){
     if(t==='candy'){const hh=.9*s,seg=6;for(let i=0;i<seg;i++){x.fillStyle=i%2?'#fff':'#ef4444';x.fillRect(px-.05*s,py-hh+i*hh/seg,.1*s,hh/seg+1)}x.strokeStyle='#ef4444';x.lineWidth=.1*s;x.beginPath();x.arc(px-side*.12*s,py-hh,.12*s,0,Math.PI,true);x.stroke();return}
     x.fillStyle='#8b5a2b';x.fillRect(px-.04*s,py-.55*s,.08*s,.55*s)}
   function drawObj(o,d){const s=Ps(d),px=PX(o.X,d),py=Py(d),fs=Math.min(H*.7,o.k*s);if(fs<4)return;x.globalAlpha=Math.max(0,Math.min(1,(46-d)/8));
-    x.fillStyle='rgba(0,0,0,.16)';x.beginPath();x.ellipse(px,py,fs*.32,fs*.07,0,0,7);x.fill();x.fillStyle='#000';x.font=`${fs}px serif`;x.textAlign='center';x.textBaseline='alphabetic';x.fillText(o.e,px,py+fs*.06);x.globalAlpha=1}
+    x.fillStyle='rgba(0,0,0,.16)';x.beginPath();x.ellipse(px,py,fs*.32,fs*.07,0,0,7);x.fill();const D=fs*1.333;x.drawImage(drvSpr(o.e),px-D/2,py-D/2-fs*.5+fs*.05,D,D);x.globalAlpha=1}
   function drawGantry(d){const s=Ps(d),hgt=GH,Xo=R+.24;for(const sd of[-1,1]){const px=PX(sd*Xo,d);x.fillStyle='#4b5563';x.fillRect(px-.05*s,Py(d)-hgt*s,.1*s,hgt*s);x.fillStyle='#6b7280';x.fillRect(px-.05*s,Py(d)-hgt*s,.03*s,hgt*s)}
     x.fillStyle='#4b5563';x.fillRect(PX(-Xo,d),Py(d)-hgt*s,2*Xo*s,.09*s);x.fillStyle='#6b7280';x.fillRect(PX(-Xo,d),Py(d)-hgt*s,2*Xo*s,.03*s)}
-  (function loop(){if(dead||!cv.isConnected)return;requestAnimationFrame(loop);if(c.paused){last=null;return}const now=performance.now(),dt=Math.min(.05,(now-(last||now))/1000);last=now;const t=(now-t0)/1000;
-    G=geo();S+=V*dt;shake=Math.max(0,shake-dt);const b=dB();
+  (function loop(){if(dead||!cv.isConnected){au?.stop();return}requestAnimationFrame(loop);if(c.paused){last=null;au?.update(0,false);return}const now=performance.now(),dt=Math.min(.05,(now-(last||now))/1000);last=now;const t=(now-t0)/1000;
+    au?.update(dt,sound.on&&!document.hidden);if(!G||geoN--<=0){G=geo();geoN=30}S+=V*dt;shake=Math.max(0,shake-dt);const b=dB();
     const gd=gw==null?null:gw-S;if(gd!=null){g=Math.max(0,Math.min(1,1-(gd-DA)/(DS-DA)));if(!lock&&cur&&gd<=DA)answer(lane)}
     const p=lock?0:1-g;fill.style.width=(p*100)+'%';bar.classList.toggle('low',p<=.3&&!lock);
     x.setTransform(dpr,0,0,dpr,0,0);
@@ -112,11 +144,10 @@ function quiz(root,c,{make,secs}){
     const gr=x.createLinearGradient(0,G.hy,0,H);gr.addColorStop(0,ENV.g[0]);gr.addColorStop(1,ENV.g[1]);x.fillStyle=gr;x.fillRect(0,G.hy,W,H-G.hy);
     x.fillStyle='rgba(0,0,0,.045)';strips(6,3,(d0,d1)=>{const ya=Py(d0),yb=Py(d1);x.fillRect(0,yb,W,ya-yb)});
     /* الطريق: إسفلت رمادي غامق ثابت، يمتد من الأفق إلى أسفل الشاشة، وكل خطوطه بنفس سرعة الحركة */
-    const rg=x.createLinearGradient(0,G.hy,0,H);rg.addColorStop(0,'#5b6270');rg.addColorStop(.25,'#3f4550');rg.addColorStop(1,'#2a2e35');x.fillStyle=rg;quad(-R*1.16,R*1.16,b,DF);
-    x.fillStyle='rgba(255,255,255,.025)';strips(3,1.5,(d0,d1)=>quad(-R,R,d0,d1));
+    const rg=x.createLinearGradient(0,G.hy,0,H);rg.addColorStop(0,'#4a505a');rg.addColorStop(.2,'#33373e');rg.addColorStop(1,'#1f2227');x.fillStyle=rg;quad(-R*1.16,R*1.16,b,DF);
     x.fillStyle='#f8fafc';quad(-R*1.16,-R,b,DF);quad(R,R*1.16,b,DF);x.fillStyle=ENV.curb;strips(1.2,.6,(d0,d1)=>{quad(-R*1.16,-R,d0,d1);quad(R,R*1.16,d0,d1)});
-    x.fillStyle='rgba(255,255,255,.92)';quad(-R+.03,-R+.075,b,DF);quad(R-.075,R-.03,b,DF);
-    x.fillStyle='rgba(255,255,255,.9)';for(let i=1;i<n;i++){const X=-R+2*R*i/n;strips(2.4,1.2,(d0,d1)=>quad(X-.022,X+.022,d0,d1))}
+    x.fillStyle='#fff';quad(-R+.03,-R+.075,b,DF);quad(R-.075,R-.03,b,DF);
+    x.fillStyle='#fff';for(let i=1;i<n;i++){const X=-R+2*R*i/n;strips(2.4,1.2,(d0,d1)=>quad(X-.022,X+.022,d0,d1))}
     /* ضباب خفيف عند الأفق */
     const hzY=Py(7),hz=x.createLinearGradient(0,G.hy-2,0,hzY);hz.addColorStop(0,ENV.sky[1]+'cc');hz.addColorStop(1,ENV.sky[1]+'00');x.fillStyle=hz;x.fillRect(0,G.hy-2,W,hzY-G.hy+2);
     /* الأعمدة والأشياء الجانبية والبوابة مرتّبة من البعيد للقريب */
@@ -128,10 +159,10 @@ function quiz(root,c,{make,secs}){
     /* اللوحات: واضحة من البداية تحت السؤال، ثم تنزل وتثبت على البوابة فوق مساراتها مع الاقتراب */
     if(cur&&lock&&ansAt){const k=(performance.now()-ansAt)/1000;signs.forEach(s=>s.el.style.opacity=Math.max(0,Math.min(1,(1.25-k)/.35)))}
     else if(cur&&gd!=null){const s=Ps(gd),slot=W*.94/n,k2=Math.max(0,Math.min(1,(DK-gd)/(DK-DA-.6))),e=k2*k2*(3-2*k2),lanePx=2*R*s/n,beamY=Py(gd)-GH*s+.09*s,top0=G.qB+8;
-      signs.forEach((sg2,k)=>{const el=sg2.el,sw=(slot-8)+(Math.min(lanePx*.9,slot*1.3)-(slot-8))*e,Lc=[...el.textContent.trim()].length||2,fs=Math.max(12,Math.min(46,sw*.2,sw/(Math.max(2,Lc)*.62)));
-        el.style.display='';el.style.left=(W*.03+slot*(k+.5)+(PX(LXw(k),gd)-W*.03-slot*(k+.5))*e)+'px';el.style.top=(top0+(beamY-top0)*e)+'px';el.style.width=sw+'px';el.style.minHeight=(sw*.42)+'px';el.style.fontSize=fs+'px';el.style.opacity=1})}
+      signs.forEach((sg2,k)=>{const el=sg2.el,sw=(slot-8)+(Math.min(lanePx*.9,slot*1.3)-(slot-8))*e,cx=W*.03+slot*(k+.5)+(PX(LXw(k),gd)-W*.03-slot*(k+.5))*e,ty=top0+(beamY-top0)*e;
+        if(el.style.display)el.style.display='';el.style.transform=`translate3d(${(cx-bw/2).toFixed(1)}px,${ty.toFixed(1)}px,0) scale(${(sw/bw).toFixed(4)})`;el.style.opacity=1})}
     else signs.forEach(s=>s.el.style.display='none');
-    const tx=PX(LXw(lane),1);carX=carX==null?tx:carX+(tx-carX)*Math.min(1,dt*9);const cw=Math.min(2*R*G.hw/n*.66,W*.3,200);car(carX,G.yc,cw/128,t,(tx-carX)/W*.6);
+    const tx=PX(LXw(lane),1);carX=carX==null?tx:carX+(tx-carX)*Math.min(1,dt*9);const cw=Math.min(2*R*G.hw/n*.7,W*.32,220);car(carX,G.yc,cw/150,t,(tx-carX)/W*.5);
     if(res){const k=(now-res.a)/900;if(k<1){x.globalAlpha=1-k;x.font=`900 ${Math.round(H*.09)}px system-ui`;x.textAlign='center';x.textBaseline='middle';x.lineWidth=6;x.strokeStyle='#fff';x.strokeText(res.t,carX,G.yc-cw*.9-k*60);x.fillStyle=res.col;x.fillText(res.t,carX,G.yc-cw*.9-k*60);x.globalAlpha=1}}
   })();
   requestAnimationFrame(()=>{size();next()});
