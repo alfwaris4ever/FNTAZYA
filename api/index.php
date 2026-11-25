@@ -161,7 +161,10 @@ function authUser(): array {
 }
 function profile(array $u): array {
   return ['email' => $u['email'], 'name' => $u['name'], 'avatar' => $u['avatar'], 'marketing' => (bool)$u['marketing'],
-          'created' => (int)$u['created'], 'admin' => in_array($u['email'], ADMIN_EMAILS, true)];
+          'created' => (int)$u['created'], 'admin' => in_array($u['email'], ADMIN_EMAILS, true), 'advertiser' => isAdvertiser($u['email'])];
+}
+function isAdvertiser(string $email): bool {
+  try { $st = db()->prepare('SELECT 1 FROM advertisers WHERE email=?'); $st->execute([$email]); return (bool)$st->fetchColumn(); } catch (Throwable $e) { return false; }
 }
 
 /* دمج التقدّم: الأرقام بالأكبر، والصح/خطأ بـ «أو»، والقوائم بالدمج بدون تكرار، وغير ذلك قيمة الجهاز تفوز */
@@ -189,7 +192,7 @@ function checkLimit(string $email): void {
 try {
   $a = $_GET['a'] ?? '';
   // الإعلانات والإحصاءات في ملف مستقل
-  if (in_array($a, ['ads', 'adev', 'adclick', 'hit', 'pubstats', 'report', 'adpricing', 'adv_register', 'adv_login', 'adv_me', 'adv_quote', 'adv_save', 'adv_cancel', 'adv_logout', 'adm_traffic', 'adm_ads', 'adm_quote', 'adm_ad_save', 'adm_ad_status', 'adm_ad_decide', 'adm_ad_del', 'adm_pricing_save', 'adm_slot_save', 'adm_adstxt'], true)) require __DIR__ . '/adserver.php';
+  if (in_array($a, ['ads', 'adev', 'adclick', 'hit', 'pubstats', 'report', 'adpricing', 'ad_booked', 'invoice', 'adv_register', 'adv_login', 'adv_me', 'adv_quote', 'adv_save', 'adv_cancel', 'adv_logout', 'adm_traffic', 'adm_ads', 'adm_quote', 'adm_ad_save', 'adm_ad_status', 'adm_ad_decide', 'adm_ad_del', 'adm_pricing_save', 'adm_slot_save', 'adm_adstxt'], true)) require __DIR__ . '/adserver.php';
   if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $a !== 'ping' && $a !== 'unsub') fail('طلب غير صالح', 405);
   $b = body();
 

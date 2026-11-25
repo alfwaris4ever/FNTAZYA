@@ -11,10 +11,10 @@
 
 /* لكل مساحة مقاس صورة لكل جهاز: d كمبيوتر (1024px فأكثر)، t تابلت (601-1023px)، m جوال (600px فأقل) */
 const AD_SLOTS = [
-  'home_top'   => ['t' => 'الرئيسية: شريط عريض أعلى الألعاب', 'size' => 'كمبيوتر 970×90 · تابلت 728×90 · جوال 320×100', 'dev' => ['d' => [970, 90], 't' => [728, 90], 'm' => [320, 100]]],
-  'game_below' => ['t' => 'صفحة اللعبة: تحت منطقة اللعب', 'size' => 'كمبيوتر 970×90 · تابلت 728×90 · جوال 320×100', 'dev' => ['d' => [970, 90], 't' => [728, 90], 'm' => [320, 100]]],
-  'game_side'  => ['t' => 'صفحة اللعبة: مربع جانبي', 'size' => 'كمبيوتر 300×250 · تابلت 728×90 · جوال 300×250', 'dev' => ['d' => [300, 250], 't' => [728, 90], 'm' => [300, 250]]],
-  'between'    => ['t' => 'بين المراحل: داخل بطاقة النتيجة', 'size' => 'كل الأجهزة 320×100', 'dev' => ['d' => [320, 100]]],
+  'home_top'   => ['t' => 'الرئيسية: شريط عريض أعلى الألعاب', 'size' => 'كمبيوتر 1940×180 · تابلت 1456×180 · جوال 640×200', 'dev' => ['d' => [970, 90], 't' => [728, 90], 'm' => [320, 100]]],
+  'game_below' => ['t' => 'صفحة اللعبة: تحت منطقة اللعب', 'size' => 'كمبيوتر 1940×180 · تابلت 1456×180 · جوال 640×200', 'dev' => ['d' => [970, 90], 't' => [728, 90], 'm' => [320, 100]]],
+  'game_side'  => ['t' => 'صفحة اللعبة: مربع جانبي', 'size' => 'كمبيوتر 600×500 · تابلت 1456×180 · جوال 600×500', 'dev' => ['d' => [300, 250], 't' => [728, 90], 'm' => [300, 250]]],
+  'between'    => ['t' => 'بين المراحل: داخل بطاقة النتيجة', 'size' => 'كل الأجهزة 640×200', 'dev' => ['d' => [320, 100]]],
 ];
 /* الأسعار المقترحة الافتراضية (ريال سعودي) وتُعدَّل من لوحة الإدارة */
 const AD_PRICE_DEFAULT = [
@@ -23,7 +23,10 @@ const AD_PRICE_DEFAULT = [
   'game_side'  => ['cpm' => 18, 'daily' => 80],
   'between'    => ['cpm' => 30, 'daily' => 120],
 ];
-const AD_SETTINGS_DEFAULT = ['currency' => 'ر.س', 'vat' => '0', 'min_impr' => '10000', 'min_days' => '3', 'pay_info' => ''];
+const AD_SCALE = 2; // الصور المطلوبة بضعف مقاس العرض لتكون حادة على الشاشات عالية الدقة
+const AD_SETTINGS_DEFAULT = ['currency' => 'ر.س', 'vat' => '0', 'min_impr' => '10000', 'min_days' => '3', 'pay_info' => '',
+  'seller_name' => 'فنتازيا', 'seller_cr' => '', 'seller_vat' => '', 'seller_address' => '', 'invoice_days' => '7'];
+const AD_HOLD = "('pending','awaiting','active','paused')"; // حالات تحجز المساحة الحصرية
 
 function adSchema(): void {
   static $done = false; if ($done) return; $done = true;
@@ -41,7 +44,8 @@ CREATE TABLE IF NOT EXISTS adv_tokens(token_hash TEXT PRIMARY KEY, adv_id INTEGE
 SQL);
   $cols = array_column(db()->query('PRAGMA table_info(ad_campaigns)')->fetchAll(), 'name');
   $add = ['creatives' => "TEXT DEFAULT ''", 'ctype' => "TEXT DEFAULT 'paid'", 'pricing' => "TEXT DEFAULT 'cpm'", 'price' => 'REAL DEFAULT 0',
-    'adv_id' => 'INTEGER DEFAULT 0', 'note' => "TEXT DEFAULT ''", 'decided' => 'INTEGER DEFAULT 0'];
+    'adv_id' => 'INTEGER DEFAULT 0', 'note' => "TEXT DEFAULT ''", 'decided' => 'INTEGER DEFAULT 0',
+    'quote' => "TEXT DEFAULT ''", 'invoice_no' => "TEXT DEFAULT ''", 'invoice_date' => "TEXT DEFAULT ''", 'paid_at' => 'INTEGER DEFAULT 0'];
   $firstFiller = !in_array('ctype', $cols, true);
   foreach ($add as $c => $def) if (!in_array($c, $cols, true)) db()->exec("ALTER TABLE ad_campaigns ADD COLUMN $c $def");
   // الإعلانات التجريبية تتحول إلى إعلانات رديفة
@@ -119,6 +123,7 @@ function adQuote(array $slots, string $pricing, string $start, string $end, int 
   $slots = array_values(array_intersect($slots, array_keys(AD_SLOTS)));
   if (!$slots) fail('اختر مساحة إعلانية واحدة على الأقل');
   $pricing = $pricing === 'daily' ? 'daily' : 'cpm';
+  if ($pricing === 'cpm') $end = ''; // باقة مرات الظهور تنتهي باكتمال العدد، بلا تاريخ نهاية
   if (!$start) $start = today();
   if ($strict && $start < today()) fail('تاريخ البداية لا يمكن أن يكون في الماضي');
   if ($end && $end < $start) fail('تاريخ النهاية قبل تاريخ البداية');
@@ -136,13 +141,17 @@ function adQuote(array $slots, string $pricing, string $start, string $end, int 
     if ($pricing === 'daily') {
       if (!$P[$s]['daily_on']) fail('الحجز اليومي غير متاح حالياً لمساحة: ' . AD_SLOTS[$s]['t']);
       // التحقق من عدم تداخل حجز حصري آخر في نفس المساحة
-      $st = db()->prepare("SELECT name, start, end FROM ad_campaigns WHERE pricing='daily' AND ctype='paid' AND status IN ('pending','active','paused') AND id<>? AND (','||slots||',') LIKE ? AND start<=? AND end>=?");
+      $st = db()->prepare("SELECT name, start, end FROM ad_campaigns WHERE pricing='daily' AND ctype='paid' AND status IN " . AD_HOLD . " AND id<>? AND (','||slots||',') LIKE ? AND start<=? AND end>=?");
       $st->execute([$exceptId, '%,' . $s . ',%', $end, $start]);
       if ($bk = $st->fetch()) fail('المساحة «' . AD_SLOTS[$s]['t'] . '» محجوزة حصرياً من ' . $bk['start'] . ' إلى ' . $bk['end'] . '. اختر تواريخ أخرى أو باقة مرات الظهور');
       $cost = $days * $P[$s]['daily'];
       $lines[] = ['slot' => $s, 't' => AD_SLOTS[$s]['t'], 'qty' => $days, 'unit' => $P[$s]['daily'], 'desc' => "$days يوم × " . $P[$s]['daily'], 'cost' => round($cost, 2), 'est' => $avg[$s] * $days];
     } else {
       if (!$P[$s]['cpm_on']) fail('باقة مرات الظهور غير متاحة حالياً لمساحة: ' . AD_SLOTS[$s]['t']);
+      // الحجز الحصري يمنع أي معلن آخر في نفس المساحة طوال مدته
+      $st = db()->prepare("SELECT start, end FROM ad_campaigns WHERE pricing='daily' AND ctype='paid' AND status IN " . AD_HOLD . " AND id<>? AND (','||slots||',') LIKE ? AND start<=? AND end>=?");
+      $st->execute([$exceptId, '%,' . $s . ',%', $start, $start]);
+      if ($bk = $st->fetch()) fail('المساحة «' . AD_SLOTS[$s]['t'] . '» محجوزة حصرياً من ' . $bk['start'] . ' إلى ' . $bk['end'] . '. اختر تاريخ بداية بعد ' . $bk['end']);
       $cost = $impr / 1000 * $P[$s]['cpm'];
       $estDays = $avg[$s] > 0 ? (int)ceil($impr / $avg[$s]) : 0;
       if ($days && $avg[$s] > 0 && $estDays > $days) $warn[] = 'قد لا تكتمل مرات ظهور «' . AD_SLOTS[$s]['t'] . '» خلال المدة المحددة (تحتاج قرابة ' . $estDays . ' يوماً حسب الزيارات الحالية)';
@@ -166,7 +175,7 @@ function buildCreatives(array $b, string $slots): array {
   foreach (explode(',', $slots) as $s) {
     foreach (array_keys(AD_SLOTS[$s]['dev']) as $dv) {
       $v = $in[$s][$dv] ?? '';
-      $u = is_string($v) && strncmp($v, 'data:image/', 11) === 0 ? saveUpload($v, AD_SLOTS[$s]['dev'][$dv], AD_SLOTS[$s]['t'] . ' - ' . ['d' => 'كمبيوتر', 't' => 'تابلت', 'm' => 'جوال'][$dv]) : cleanImg($v);
+      $u = is_string($v) && strncmp($v, 'data:image/', 11) === 0 ? saveUpload($v, [AD_SLOTS[$s]['dev'][$dv][0] * AD_SCALE, AD_SLOTS[$s]['dev'][$dv][1] * AD_SCALE], AD_SLOTS[$s]['t'] . ' - ' . ['d' => 'كمبيوتر', 't' => 'تابلت', 'm' => 'جوال'][$dv]) : cleanImg($v);
       if ($u !== '') $creatives[$s][$dv] = $u;
     }
     if (empty($creatives[$s])) fail('أضف صورة واحدة على الأقل لمساحة: ' . AD_SLOTS[$s]['t']);
@@ -202,6 +211,15 @@ function campaignRow(array $c): array {
   return $c;
 }
 function money($v, array $S): string { return number_format((float)$v, 2) . ' ' . $S['currency']; }
+function campDetailsHtml(string $name, array $q, array $S): string {
+  $r = '<table role="presentation" cellpadding="6" style="font-size:14px;line-height:1.7;border-collapse:collapse;width:100%;background:#f8fafc;border-radius:12px">'
+    . '<tr><td><b>الحملة</b></td><td>' . h($name) . '</td></tr>'
+    . '<tr><td><b>الباقة</b></td><td>' . ($q['pricing'] === 'daily' ? 'حجز حصري من ' . h($q['start']) . ' إلى ' . h($q['end']) . ' (' . (int)$q['days'] . ' يوم)' : number_format((int)$q['impr']) . ' مرة ظهور لكل مساحة، تبدأ ' . h($q['start'])) . '</td></tr>';
+  foreach ($q['lines'] as $l) $r .= '<tr><td>' . h($l['t']) . '</td><td>' . money($l['cost'], $S) . '</td></tr>';
+  if (!empty($q['vat'])) $r .= '<tr><td>ضريبة القيمة المضافة</td><td>' . money($q['vat'], $S) . '</td></tr>';
+  return $r . '<tr><td><b>الإجمالي</b></td><td><b>' . money($q['total'], $S) . '</b></td></tr></table>';
+}
+function invoiceNo(int $id): string { return 'FZ-' . gmdate('Y') . '-' . str_pad((string)$id, 4, '0', STR_PAD_LEFT); }
 
 adSchema();
 $a = $_GET['a'] ?? '';
@@ -319,6 +337,27 @@ switch ($a) {
       'totals' => campaignTotals((int)$c['id']), 'daily' => $d->fetchAll(), 'slots' => $s->fetchAll(), 'slotNames' => array_map(fn($x) => $x['t'], AD_SLOTS)]);
   }
 
+  case 'ad_booked': { // أيام الحجز الحصري لكل مساحة (للتقويم)
+    $ex = (int)($b['id'] ?? 0); $o = array_fill_keys(array_keys(AD_SLOTS), []);
+    $st = db()->prepare("SELECT slots, start, end FROM ad_campaigns WHERE pricing='daily' AND ctype='paid' AND status IN " . AD_HOLD . " AND id<>? AND end>=?"); $st->execute([$ex, today()]);
+    foreach ($st->fetchAll() as $r) foreach (explode(',', $r['slots']) as $s) if (isset($o[$s])) $o[$s][] = [$r['start'], $r['end']];
+    out(['ok' => true, 'booked' => $o, 'today' => today()]);
+  }
+
+  case 'invoice': { // الفاتورة الإلكترونية للمعلن (رابط سري)
+    $t = (string)($_GET['t'] ?? '');
+    if (!preg_match('/^[a-f0-9]{32}$/', $t)) fail('رابط غير صالح', 404);
+    $st = db()->prepare('SELECT c.*, a.email adv_email, a.name adv_name, a.phone adv_phone, a.company adv_company FROM ad_campaigns c LEFT JOIN advertisers a ON a.id=c.adv_id WHERE c.report_token=?'); $st->execute([$t]); $c = $st->fetch();
+    if (!$c || !$c['invoice_no']) fail('لم تصدر فاتورة لهذه الحملة بعد', 404);
+    $S = adSettings(); $q = json_decode((string)$c['quote'], true) ?: ['lines' => [['t' => $c['name'], 'desc' => '', 'cost' => (float)$c['price']]], 'subtotal' => (float)$c['price'], 'vat' => 0, 'vatRate' => 0, 'total' => (float)$c['price']];
+    out(['ok' => true, 'invoice' => ['no' => $c['invoice_no'], 'date' => $c['invoice_date'], 'due' => gmdate('Y-m-d', strtotime($c['invoice_date'] . ' UTC') + (int)$S['invoice_days'] * 86400),
+      'paid' => (int)$c['paid_at'] > 0, 'paid_date' => (int)$c['paid_at'] ? gmdate('Y-m-d', (int)$c['paid_at'] + 3 * 3600) : '', 'status' => $c['status']],
+      'seller' => ['name' => $S['seller_name'], 'cr' => $S['seller_cr'], 'vat' => $S['seller_vat'], 'address' => $S['seller_address'], 'email' => ADMIN_EMAILS[0]],
+      'buyer' => ['company' => $c['adv_company'] ?: $c['advertiser'], 'name' => $c['adv_name'], 'email' => $c['adv_email'], 'phone' => $c['adv_phone']],
+      'campaign' => ['name' => $c['name'], 'pricing' => $c['pricing'], 'start' => $c['start'], 'end' => $c['end'], 'impr' => (int)$c['max_impr']],
+      'quote' => $q, 'currency' => $S['currency'], 'pay_info' => $S['pay_info']]);
+  }
+
   /* ---------- بوابة المعلنين ---------- */
   case 'adv_register': {
     $email = cleanEmail($b['email'] ?? ''); $pass = (string)($b['password'] ?? '');
@@ -331,6 +370,10 @@ switch ($a) {
     if ($ex->fetch()) fail('هذا البريد مسجّل. اختر «تسجيل الدخول»');
     db()->prepare('INSERT INTO advertisers(email,pass_hash,company,name,phone,created,last_seen) VALUES(?,?,?,?,?,?,?)')->execute([$email, password_hash($pass, PASSWORD_DEFAULT), $company, $name, $phone, time(), time()]);
     $id = (int)db()->lastInsertId(); $st = db()->prepare('SELECT * FROM advertisers WHERE id=?'); $st->execute([$id]);
+    try { sendMail($email, 'أهلاً بك شريكاً في نجاح فنتازيا', 'أهلاً بك شريك النجاح 🤝',
+      '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($name) . '،<br>شكراً لانضمام <b>' . h($company) . '</b> إلى معلني فنتازيا. أنشئ حملتك من بوابة المعلنين، وسنراجعها ونرسل لك الفاتورة، وبعد السداد تبدأ حملتك فوراً.</p>'
+      . '<p><a href="https://fntazya.com/advertiser.html" style="background:#5b3cff;color:#fff;padding:10px 20px;border-radius:99px;text-decoration:none;font-weight:bold">بوابة المعلنين</a></p>', "مرحباً بك في فنتازيا. بوابة المعلنين: https://fntazya.com/advertiser.html");
+    } catch (Throwable $e) { error_log('adv welcome: ' . $e->getMessage()); }
     out(['ok' => true, 'token' => advToken($id), 'adv' => advPublic($st->fetch())]);
   }
   case 'adv_login': {
@@ -364,19 +407,23 @@ switch ($a) {
     [$creatives, $img] = buildCreatives($b, $slots);
     $name = mb_substr(trim(strip_tags((string)($b['name'] ?? ''))), 0, 100) ?: 'حملة ' . $u['company'];
     $vals = [$name, $u['company'], $slots, catsFrom($b['cats'] ?? []), 'image', $img, '', cleanUrl($b['link']), mb_substr(strip_tags((string)($b['alt'] ?? '')), 0, 150),
-      $q['start'], $q['end'], 1, $q['pricing'] === 'cpm' ? $q['impr'] : 0, 'pending', json_encode($creatives, JSON_UNESCAPED_SLASHES), 'paid', $q['pricing'], $q['total'], (int)$u['id']];
-    if ($id) { $vals[] = $id; db()->prepare('UPDATE ad_campaigns SET name=?,advertiser=?,slots=?,cats=?,kind=?,img=?,html=?,link=?,alt=?,start=?,end=?,weight=?,max_impr=?,status=?,creatives=?,ctype=?,pricing=?,price=?,adv_id=?,note=\'\' WHERE id=?')->execute($vals); }
+      $q['start'], $q['end'], 1, $q['pricing'] === 'cpm' ? $q['impr'] : 0, 'pending', json_encode($creatives, JSON_UNESCAPED_SLASHES), 'paid', $q['pricing'], $q['total'], (int)$u['id'], json_encode($q, JSON_UNESCAPED_UNICODE)];
+    $again = $id > 0;
+    if ($id) { $vals[] = $id; db()->prepare('UPDATE ad_campaigns SET name=?,advertiser=?,slots=?,cats=?,kind=?,img=?,html=?,link=?,alt=?,start=?,end=?,weight=?,max_impr=?,status=?,creatives=?,ctype=?,pricing=?,price=?,adv_id=?,quote=?,note=\'\' WHERE id=?')->execute($vals); }
     else { $vals[] = bin2hex(random_bytes(16)); $vals[] = time();
-      db()->prepare('INSERT INTO ad_campaigns(name,advertiser,slots,cats,kind,img,html,link,alt,start,end,weight,max_impr,status,creatives,ctype,pricing,price,adv_id,report_token,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($vals); $id = (int)db()->lastInsertId(); }
+      db()->prepare('INSERT INTO ad_campaigns(name,advertiser,slots,cats,kind,img,html,link,alt,start,end,weight,max_impr,status,creatives,ctype,pricing,price,adv_id,quote,report_token,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($vals); $id = (int)db()->lastInsertId(); }
     try {
       $rows = '<p style="font-size:15px;line-height:1.9">الحملة: <b>' . h($name) . '</b><br>المعلن: ' . h($u['company']) . ' (' . h($u['email']) . ' · ' . h($u['phone']) . ')<br>'
         . ($q['pricing'] === 'daily' ? 'حجز حصري من ' . $q['start'] . ' إلى ' . $q['end'] : number_format($q['impr']) . ' مرة ظهور') . '<br>القيمة: <b>' . money($q['total'], $S) . '</b></p>'
         . '<p><a href="https://fntazya.com/admin.html#ads" style="background:#5b3cff;color:#fff;padding:10px 20px;border-radius:99px;text-decoration:none;font-weight:bold">مراجعة الحملة</a></p>';
       foreach (ADMIN_EMAILS as $to) sendMail($to, 'حملة إعلانية جديدة بانتظار الموافقة: ' . $u['company'], 'حملة جديدة بانتظار الموافقة 📢', $rows, "حملة جديدة من {$u['company']}: $name - " . money($q['total'], $S));
-      $pay = trim($S['pay_info']) !== '' ? '<p style="font-size:15px;line-height:1.9;background:#f5f3ff;padding:12px;border-radius:12px"><b>طريقة الدفع:</b><br>' . nl2br(h($S['pay_info'])) . '</p>' : '<p>سيتواصل معك فريق فنتازيا لإتمام الدفع.</p>';
-      sendMail($u['email'], 'استلمنا طلب حملتك الإعلانية في فنتازيا', 'استلمنا طلب حملتك ✅',
-        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($u['name']) . '،<br>استلمنا طلب الحملة <b>' . h($name) . '</b> بقيمة <b>' . money($q['total'], $S) . '</b>. بعد إتمام الدفع نراجع الإعلان ونفعّله، ويصلك بريد بذلك.</p>' . $pay,
-        "استلمنا طلب حملتك $name بقيمة " . money($q['total'], $S));
+      $link = 'https://fntazya.com/advertiser.html#c=' . $id;
+      sendMail($u['email'], ($again ? 'استلمنا تعديل حملتك: ' : 'شكراً لثقتك بفنتازيا: ') . $name, $again ? 'استلمنا حملتك المعدّلة ✅' : 'شكراً لك شريك النجاح 🤝',
+        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($u['name']) . '،<br>' . ($again ? 'استلمنا حملتك بعد التعديل، وعادت إلى المراجعة.' : 'شكراً لاختيارك فنتازيا شريكاً لنجاح علامتك. استلمنا طلب حملتك وهو الآن قيد المراجعة.') . '</p>'
+        . campDetailsHtml($name, $q, $S)
+        . '<p style="font-size:14px;line-height:1.9"><b>الخطوات التالية:</b><br>1) نراجع الإعلان ⏳<br>2) نرسل لك الفاتورة الإلكترونية 📄<br>3) بعد السداد تبدأ حملتك 🚀</p>'
+        . '<p><a href="' . h($link) . '" style="background:#5b3cff;color:#fff;padding:10px 20px;border-radius:99px;text-decoration:none;font-weight:bold">متابعة حالة الحملة</a></p>',
+        "استلمنا طلب حملتك $name بقيمة " . money($q['total'], $S) . ". تابع حالتها: $link");
     } catch (Throwable $e) { error_log('adv_save mail: ' . $e->getMessage()); }
     out(['ok' => true, 'id' => $id, 'quote' => $q, 'pay_info' => $S['pay_info']]);
   }
@@ -433,19 +480,21 @@ switch ($a) {
     if ($kind === 'html' && trim($html) === '') fail('ألصق كود الإعلان');
     $pricing = ($b['pricing'] ?? 'cpm') === 'daily' ? 'daily' : 'cpm';
     $start = cleanDate($b['start'] ?? ''); $end = cleanDate($b['end'] ?? ''); $impr = max(0, (int)($b['max_impr'] ?? 0));
-    $price = 0.0;
+    $price = 0.0; $qjson = '';
     if ($ctype === 'paid') {
       if ($pricing === 'daily' && (!$start || !$end)) fail('الحجز اليومي يحتاج تاريخ بداية ونهاية');
+      if ($pricing === 'cpm') $end = '';
       $q = adQuote(explode(',', $slots), $pricing, $start ?: today(), $end, $impr, $id, false);
       $price = isset($b['price']) && $b['price'] !== '' ? max(0, (float)$b['price']) : $q['total'];
+      $qjson = json_encode($q, JSON_UNESCAPED_UNICODE);
       if ($pricing === 'daily') $impr = 0;
     } else { $pricing = 'cpm'; $impr = 0; $start = ''; $end = ''; }
-    $status = in_array($b['status'] ?? '', ['active', 'paused', 'pending'], true) ? $b['status'] : 'active';
+    $status = in_array($b['status'] ?? '', ['active', 'paused', 'pending', 'awaiting'], true) ? $b['status'] : 'active';
     $vals = [mb_substr(trim((string)($b['name'] ?? '')), 0, 100) ?: 'حملة بدون اسم', $ctype === 'filler' ? 'فنتازيا (رديف)' : mb_substr(trim((string)($b['advertiser'] ?? '')), 0, 100), $slots,
       catsFrom($b['cats'] ?? []), $kind, $img, $html, cleanUrl($b['link'] ?? ''), mb_substr((string)($b['alt'] ?? ''), 0, 150), $start, $end,
-      max(1, min(10, (int)($b['weight'] ?? 1))), $impr, $status, $creatives ? json_encode($creatives, JSON_UNESCAPED_SLASHES) : '', $ctype, $pricing, $price];
-    if ($id) { $vals[] = $id; db()->prepare('UPDATE ad_campaigns SET name=?,advertiser=?,slots=?,cats=?,kind=?,img=?,html=?,link=?,alt=?,start=?,end=?,weight=?,max_impr=?,status=?,creatives=?,ctype=?,pricing=?,price=? WHERE id=?')->execute($vals); }
-    else { $vals[] = bin2hex(random_bytes(16)); $vals[] = time(); db()->prepare('INSERT INTO ad_campaigns(name,advertiser,slots,cats,kind,img,html,link,alt,start,end,weight,max_impr,status,creatives,ctype,pricing,price,report_token,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($vals); }
+      max(1, min(10, (int)($b['weight'] ?? 1))), $impr, $status, $creatives ? json_encode($creatives, JSON_UNESCAPED_SLASHES) : '', $ctype, $pricing, $price, $qjson];
+    if ($id) { $vals[] = $id; db()->prepare('UPDATE ad_campaigns SET name=?,advertiser=?,slots=?,cats=?,kind=?,img=?,html=?,link=?,alt=?,start=?,end=?,weight=?,max_impr=?,status=?,creatives=?,ctype=?,pricing=?,price=?,quote=? WHERE id=?')->execute($vals); }
+    else { $vals[] = bin2hex(random_bytes(16)); $vals[] = time(); db()->prepare('INSERT INTO ad_campaigns(name,advertiser,slots,cats,kind,img,html,link,alt,start,end,weight,max_impr,status,creatives,ctype,pricing,price,quote,report_token,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($vals); }
     out(['ok' => true]);
   }
 
@@ -455,22 +504,39 @@ switch ($a) {
     out(['ok' => true]);
   }
 
-  case 'adm_ad_decide': { // الموافقة بعد الدفع أو الرفض
+  case 'adm_ad_decide': { // approve = قبول المحتوى وإرسال الفاتورة، paid = تم السداد والتفعيل، reject = رفض مع السبب
     requireAdmin(); $S = adSettings();
-    $id = (int)($b['id'] ?? 0); $ok = ($b['decision'] ?? '') === 'approve'; $note = mb_substr(trim(strip_tags((string)($b['note'] ?? ''))), 0, 500);
-    $st = db()->prepare("SELECT c.*, a.email adv_email, a.name adv_name FROM ad_campaigns c LEFT JOIN advertisers a ON a.id=c.adv_id WHERE c.id=? AND c.status='pending'"); $st->execute([$id]); $c = $st->fetch();
-    if (!$c) fail('الحملة غير موجودة أو تمت مراجعتها');
-    if ($ok && $c['pricing'] === 'daily' && $c['end'] && $c['end'] < today()) fail('انتهت تواريخ هذا الحجز. اطلب من المعلن تعديل التواريخ');
-    db()->prepare('UPDATE ad_campaigns SET status=?, note=?, decided=? WHERE id=?')->execute([$ok ? 'active' : 'rejected', $note, time(), $id]);
-    if (!empty($c['adv_email'])) try {
+    $id = (int)($b['id'] ?? 0); $dec = (string)($b['decision'] ?? ''); $note = mb_substr(trim(strip_tags((string)($b['note'] ?? ''))), 0, 500);
+    $st = db()->prepare("SELECT c.*, a.email adv_email, a.name adv_name FROM ad_campaigns c LEFT JOIN advertisers a ON a.id=c.adv_id WHERE c.id=?"); $st->execute([$id]); $c = $st->fetch();
+    if (!$c) fail('الحملة غير موجودة');
+    $from = ['approve' => ['pending'], 'paid' => ['awaiting'], 'reject' => ['pending', 'awaiting']][$dec] ?? null;
+    if (!$from) fail('إجراء غير معروف');
+    if (!in_array($c['status'], $from, true)) fail('حالة الحملة تغيّرت، حدّث الصفحة');
+    if ($dec !== 'reject' && $c['pricing'] === 'daily' && $c['end'] && $c['end'] < today()) fail('انتهت تواريخ هذا الحجز. ارفضه واطلب من المعلن تعديل التواريخ');
+    $link = 'https://fntazya.com/advertiser.html#c=' . $id; $btn = fn($u, $t) => '<p><a href="' . h($u) . '" style="background:#5b3cff;color:#fff;padding:10px 20px;border-radius:99px;text-decoration:none;font-weight:bold">' . $t . '</a></p>';
+    $q = json_decode((string)$c['quote'], true) ?: null;
+    if ($dec === 'approve') {
+      $no = $c['invoice_no'] ?: invoiceNo($id);
+      db()->prepare("UPDATE ad_campaigns SET status='awaiting', note=?, decided=?, invoice_no=?, invoice_date=? WHERE id=?")->execute([$note, time(), $no, today(), $id]);
+      $inv = 'https://fntazya.com/invoice.html?t=' . $c['report_token'];
+      if (!empty($c['adv_email'])) try { sendMail($c['adv_email'], 'فاتورة حملتك الإعلانية ' . $no . ' - فنتازيا', 'تمت الموافقة على إعلانك 🎉',
+        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($c['adv_name']) . '،<br>راجعنا حملة <b>' . h($c['name']) . '</b> ووافقنا عليها. أرفقنا لك الفاتورة الإلكترونية رقم <b>' . h($no) . '</b> بقيمة <b>' . money($c['price'], $S) . '</b>، وبعد وصول السداد نفعّل حملتك ويصلك بريد بذلك.</p>'
+        . ($q ? campDetailsHtml($c['name'], $q, $S) : '') . $btn($inv, '📄 عرض الفاتورة والسداد') . '<p style="font-size:13px"><a href="' . h($link) . '">متابعة حالة الحملة</a></p>',
+        "تمت الموافقة على حملتك {$c['name']}. الفاتورة $no: $inv"); } catch (Throwable $e) { error_log('invoice mail: ' . $e->getMessage()); }
+    } elseif ($dec === 'paid') {
+      db()->prepare("UPDATE ad_campaigns SET status='active', paid_at=?, decided=? WHERE id=?")->execute([time(), time(), $id]);
       $rep = 'https://fntazya.com/ad-report.html?t=' . $c['report_token'];
-      if ($ok) sendMail($c['adv_email'], 'تم تفعيل حملتك الإعلانية في فنتازيا', 'حملتك تعمل الآن 🎉',
-        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($c['adv_name']) . '،<br>تم تأكيد الدفع وتفعيل حملة <b>' . h($c['name']) . '</b>.' . ($note ? '<br>' . h($note) : '') . '</p><p><a href="' . h($rep) . '" style="background:#5b3cff;color:#fff;padding:10px 20px;border-radius:99px;text-decoration:none;font-weight:bold">تقرير الحملة المباشر</a></p>',
-        "تم تفعيل حملتك {$c['name']}. التقرير: $rep");
-      else sendMail($c['adv_email'], 'بخصوص حملتك الإعلانية في فنتازيا', 'حملتك تحتاج تعديلاً',
-        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($c['adv_name']) . '،<br>لم نتمكن من تفعيل حملة <b>' . h($c['name']) . '</b>.' . ($note ? '<br><b>السبب:</b> ' . h($note) : '') . '<br>يمكنك تعديلها وإعادة إرسالها من <a href="https://fntazya.com/advertiser.html">بوابة المعلنين</a>.</p>',
-        "لم نتمكن من تفعيل حملتك {$c['name']}. $note");
-    } catch (Throwable $e) { error_log('decide mail: ' . $e->getMessage()); }
+      if (!empty($c['adv_email'])) try { sendMail($c['adv_email'], 'حملتك تعمل الآن في فنتازيا 🚀', 'وصل السداد وبدأت حملتك 🚀',
+        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($c['adv_name']) . '،<br>شكراً لك، وصلنا سداد الفاتورة <b>' . h($c['invoice_no']) . '</b> وتم تفعيل حملة <b>' . h($c['name']) . '</b>' . ($c['start'] > today() ? ' وستبدأ في ' . h($c['start']) : '') . '. تابع المشاهدات والنقرات لحظة بلحظة من التقرير المباشر.</p>'
+        . $btn($rep, '📊 تقرير الحملة المباشر'), "تم تفعيل حملتك {$c['name']}. التقرير: $rep"); } catch (Throwable $e) { error_log('paid mail: ' . $e->getMessage()); }
+    } else {
+      db()->prepare("UPDATE ad_campaigns SET status='rejected', note=?, decided=? WHERE id=?")->execute([$note, time(), $id]);
+      if (!empty($c['adv_email'])) try { sendMail($c['adv_email'], 'حملتك تحتاج تعديلاً - فنتازيا', 'حملتك تحتاج تعديلاً ✏️',
+        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($c['adv_name']) . '،<br>راجعنا حملة <b>' . h($c['name']) . '</b> ولم نتمكن من قبولها بشكلها الحالي.</p>'
+        . ($note ? '<p style="font-size:15px;line-height:1.9;background:#fef2f2;padding:12px;border-radius:12px"><b>السبب:</b> ' . nl2br(h($note)) . '</p>' : '')
+        . '<p style="font-size:15px;line-height:1.9">يمكنك تعديل الحملة وإعادة إرسالها للمراجعة من صفحة الحملة.</p>' . $btn($link, '✏️ تعديل الحملة وإعادة الإرسال'),
+        "حملتك {$c['name']} تحتاج تعديلاً. السبب: $note. عدّلها من: $link"); } catch (Throwable $e) { error_log('reject mail: ' . $e->getMessage()); }
+    }
     out(['ok' => true]);
   }
 
