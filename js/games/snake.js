@@ -1,6 +1,6 @@
 /* لعبة: G.snake (ملف مستقل). أي دالة أو بيانات هنا خاصة بهذه اللعبة فقط. */
-/* 10 أرضيات تتبدّل مع كل مرحلة: [فاتح، غامق] */
-const SNAKE_FLOORS=[['#7dd3fc','#38bdf8'],['#fbcfe8','#f9a8d4'],['#86efac','#4ade80'],['#ddd6fe','#c4b5fd'],['#fed7aa','#fdba74'],['#fef08a','#fde047'],['#99f6e4','#5eead4'],['#fecaca','#fca5a5'],['#94a3b8','#64748b'],['#d9f99d','#bef264']];
+/* 10 أرضيات فاتحة ومبهجة تتبدّل مع كل مرحلة: [فاتح، أغمق قليلاً] */
+const SNAKE_FLOORS=[['#e0f2fe','#bae6fd'],['#fce7f3','#fbcfe8'],['#dcfce7','#bbf7d0'],['#ede9fe','#ddd6fe'],['#ffedd5','#fed7aa'],['#fef9c3','#fef08a'],['#ccfbf1','#99f6e4'],['#ffe4e6','#fecdd3'],['#fae8ff','#f5d0fe'],['#ecfccb','#d9f99d']];
 /* الجوائز: تفاحة 1 (دائماً موجودة)، برتقالة 2 (تختفي بعد مدة)، موزة 3 (تتحرك ولا تختفي)، عنبة 4 (تتحرك وتختفي) */
 const SNAKE_PRIZES={apple:{e:'🍎',v:1},orange:{e:'🍊',v:2,life:6500},banana:{e:'🍌',v:3,move:3},grape:{e:'🍇',v:4,life:5500,move:2}};
 G.snake=(root,c)=>{
@@ -16,7 +16,7 @@ G.snake=(root,c)=>{
   const gate=k=>({k,open:false,a:0,b:-1,until:0,warn:false});const gH=gate('h'),gV=gate('v');
   const stepsOf=ms=>Math.max(4,Math.round(ms/speed));
   function cycleGate(g,first){if(g.open&&!first){g.open=false;g.until=tick+stepsOf(rnd(easy?1500:2500,easy?3500:6000))}
-    else{g.open=true;const full=Math.random()<(easy?.7:c.f(.5,.25));if(full){g.a=0;g.b=N-1}else{const len=rnd(3,Math.max(3,N-4));g.a=rnd(0,N-len);g.b=g.a+len-1}g.until=tick+stepsOf(rnd(easy?6000:4000,easy?10000:8000))}}
+    else{g.open=true;g.a=0;g.b=N-1; /* البوابة تفتح كامل الجنبين دائماً */g.until=tick+stepsOf(rnd(easy?6000:4000,easy?10000:8000))}}
   cycleGate(gH,true);cycleGate(gV,true);if(!easy&&Math.random()<.5){gV.open=false}
   const inGate=(g,i)=>g.open&&i>=g.a&&i<=g.b;
   /* الجوائز */
@@ -43,7 +43,7 @@ G.snake=(root,c)=>{
   function render(){const B=N*u,now=performance.now(),t=started?Math.min(1,(now-lastStep)/speed):1;
     /* الأرضية */
     x.fillStyle=FL[1];x.fillRect(0,0,B,B);x.fillStyle=FL[0];for(let i=0;i<N;i++)for(let j=0;j<N;j++)if((i+j)%2)x.fillRect(i*u,j*u,u,u);
-    const vg=x.createRadialGradient(B/2,B/2,B*.35,B/2,B/2,B*.78);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.18)');x.fillStyle=vg;x.fillRect(0,0,B,B);
+    const vg=x.createRadialGradient(B/2,B/2,B*.35,B/2,B/2,B*.78);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.07)');x.fillStyle=vg;x.fillRect(0,0,B,B);
     /* الحجارة: مربع رمادي غامق عليه X */
     rocks.forEach(r=>{const p=u*.08,X0=r.x*u+p,Y0=r.y*u+p,w=u-2*p;x.fillStyle='#374151';x.beginPath();x.roundRect(X0,Y0,w,w,u*.14);x.fill();x.strokeStyle='#9ca3af';x.lineWidth=u*.11;x.lineCap='round';
       x.beginPath();x.moveTo(X0+w*.26,Y0+w*.26);x.lineTo(X0+w*.74,Y0+w*.74);x.moveTo(X0+w*.74,Y0+w*.26);x.lineTo(X0+w*.26,Y0+w*.74);x.stroke()});
@@ -61,13 +61,15 @@ G.snake=(root,c)=>{
       x.fillStyle=gl;x.beginPath();x.arc(px,py,u*.85*pul,0,7);x.fill();x.font=`${u*.88*pul}px serif`;x.fillText(P.e,px,py+u*.05);
       if(P.v>1){x.font=`800 ${u*.34}px system-ui,sans-serif`;x.lineWidth=u*.08;x.strokeStyle='#fff';x.strokeText(P.v,px+u*.34,py-u*.32);x.fillStyle='#1d2350';x.fillText(P.v,px+u*.34,py-u*.32)}}
     /* الثعبان بحركة انسيابية بين الخانات */
-    const L=sn.length,ctr=p=>[(p.x+.5)*u,(p.y+.5)*u];let h0=old[0];if(Math.abs(h0.x-sn[0].x)+Math.abs(h0.y-sn[0].y)>1)h0={x:sn[0].x-dir.x,y:sn[0].y-dir.y};
-    const oT=old[old.length-1],nT=sn[L-1];const tl=Math.abs(oT.x-nT.x)+Math.abs(oT.y-nT.y)>1?nT:oT;
-    const pts=[[(lerp(h0.x,sn[0].x,t)+.5)*u,(lerp(h0.y,sn[0].y,t)+.5)*u],...sn.slice(1,L-1).map(ctr),[(lerp(tl.x,nT.x,t)+.5)*u,(lerp(tl.y,nT.y,t)+.5)*u]];
+    /* كل خانة تنزلق من مكانها القديم لمكانها الجديد، مع نقاط الزوايا، فيبقى طول الثعبان ثابتاً بلا وميض */
+    const L=sn.length,ctr=p=>[(p.x+.5)*u,(p.y+.5)*u],pos=[];
+    for(let i=0;i<L;i++){const n2=sn[i],o=old[Math.min(i,old.length-1)],dx=n2.x-o.x,dy=n2.y-o.y,ox=Math.abs(dx)>1?n2.x+Math.sign(dx):o.x,oy=Math.abs(dy)>1?n2.y+Math.sign(dy):o.y;
+      pos.push([(lerp(ox,n2.x,t)+.5)*u,(lerp(oy,n2.y,t)+.5)*u])}
+    const pts=[pos[0]];for(let i=1;i<L;i++){pts.push(ctr(sn[i]));pts.push(pos[i])}
     x.lineCap='round';x.lineJoin='round';
     const path=(ox,oy)=>{x.beginPath();pts.forEach(([a,b2],i)=>{if(i&&Math.hypot(a-pts[i-1][0],b2-pts[i-1][1])>u*1.6)x.moveTo(a+ox,b2+oy);else i?x.lineTo(a+ox,b2+oy):x.moveTo(a+ox,b2+oy)});x.stroke()};
     x.strokeStyle='rgba(0,0,0,.3)';x.lineWidth=u*.8;path(0,u*.1);
-    const sg=x.createLinearGradient(pts[0][0],pts[0][1],pts[pts.length-1][0],pts[pts.length-1][1]);sg.addColorStop(0,'#7c3aed');sg.addColorStop(1,'#db2777');x.strokeStyle=sg;x.lineWidth=u*.78;path(0,0);
+    const sg=x.createRadialGradient(pts[0][0],pts[0][1],0,pts[0][0],pts[0][1],Math.max(u*2,L*u*.9));sg.addColorStop(0,'#7c3aed');sg.addColorStop(1,'#db2777');x.strokeStyle=sg;x.lineWidth=u*.78;path(0,0);
     x.strokeStyle='rgba(255,255,255,.28)';x.lineWidth=u*.26;path(-u*.08,-u*.1);
     const [hx,hy]=pts[0],hg=x.createRadialGradient(hx-u*.15,hy-u*.18,u*.05,hx,hy,u*.55);hg.addColorStop(0,'#c4b5fd');hg.addColorStop(1,'#5b21b6');x.fillStyle=hg;x.beginPath();x.arc(hx,hy,u*.5,0,7);x.fill();
     const ex=-dir.y,ey=dir.x;[1,-1].forEach(sgn=>{const cx=hx+dir.x*u*.16+ex*sgn*u*.2,cy=hy+dir.y*u*.16+ey*sgn*u*.2;x.fillStyle='#fff';x.beginPath();x.arc(cx,cy,u*.15,0,7);x.fill();x.fillStyle='#111';x.beginPath();x.arc(cx+dir.x*u*.05,cy+dir.y*u*.05,u*.075,0,7);x.fill()});
