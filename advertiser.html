@@ -36,7 +36,13 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 8px;t
 .track span.done{background:#dcfce7;color:#166534}.track span.now{background:#fef3c7;color:#92400e}.track span.bad{background:#fee2e2;color:#b91c1c}
 .rej{background:#fef2f2;border:2px solid #fecaca;border-radius:14px;padding:14px;line-height:1.8;margin:10px 0}
 .imgs{display:flex;flex-wrap:wrap;gap:10px}.imgs figure{margin:0;background:#f8fafc;border-radius:12px;padding:8px;max-width:320px}.imgs img{max-width:100%;max-height:140px;display:block;border-radius:8px}.imgs figcaption{font-size:12px;color:#64748b;margin-top:4px}
-.st.awaiting{background:#e0e7ff}
+.st.awaiting{background:#e0e7ff}.st.ended{background:#e2e8f0}
+.ln{padding:2px 0}.ln+.ln{border-top:1px dashed #eef1ff}
+.bal{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}@media(max-width:600px){.bal{grid-template-columns:1fr}}.bal div{background:#f8fafc;border-radius:14px;padding:12px}.bal span{display:block;color:#64748b;font-size:13px;font-weight:700}.bal b{font-size:22px}.bal .rm{background:#f5f3ff}.bal .rm b{color:#5b3cff}
+.pbar{height:10px;background:#eef1ff;border-radius:99px;margin:12px 0 4px;overflow:hidden}.pbar i{display:block;height:100%;background:linear-gradient(90deg,#5b3cff,#ec4899)}
+.sl{border:2px solid #eef1ff;border-radius:14px;padding:12px;margin-bottom:12px}.sl-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}.sl-h span{color:#5b3cff;font-weight:700;font-size:14px}
+.im{display:flex;align-items:center;gap:14px;padding:8px 0;border-top:1px dashed #eef1ff}.im img{width:min(420px,60%);max-height:170px;object-fit:contain;border-radius:8px;background:#f8fafc}
+.im-s{display:flex;flex-direction:column;gap:2px;font-size:14px}.im-s span{color:#475569}
 .fg{margin-inline-start:12px;font-size:14px;font-weight:700}
 .terms{background:#f8fafc;border:2px solid #e2e6ff;border-radius:14px;padding:14px;margin:12px 0;display:flex;flex-direction:column;gap:8px}
 .terms label.chk{display:flex!important;align-items:flex-start;gap:8px;margin:0;line-height:1.7;font-weight:600!important;font-size:14px;cursor:pointer}.terms input{width:18px;height:18px;margin-top:4px;accent-color:#5b3cff;flex:none}
@@ -51,8 +57,9 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 8px;t
 <script>
 const app=document.getElementById('app'),esc=AdForm.esc,fmt=AdForm.fmt;let tok=localStorage.getItem('fz:advtoken'),ME=null;
 const CATS={edu:'تعليمية',brain:'الذكاء',memory:'الذاكرة',focus:'التركيز',speed:'السرعة',logic:'المنطق',action:'حركة وسرعة',classic:'كلاسيكية',cars:'سيارات',io:'io',two:'لاعبَين',puzzle:'ألغاز',dress:'تلبيس وتجميل'};
-const ST={pending:'⏳ بانتظار الموافقة',awaiting:'💳 بانتظار السداد',active:'🟢 مقبولة وتعمل',paused:'⏸️ موقوفة مؤقتاً',rejected:'❌ مرفوضة، تحتاج تعديلاً'};
-const stName=c=>c.status==='active'&&!c.live?(c.start>new Date(Date.now()+108e5).toISOString().slice(0,10)?'🗓️ مقبولة، تبدأ '+c.start:'⚪ منتهية'):ST[c.status]||c.status;
+const ST={pending:'⏳ بانتظار الموافقة',awaiting:'💳 بانتظار السداد',active:'🟢 مقبولة وتعمل',paused:'⏸️ موقوفة مؤقتاً',rejected:'❌ مرفوضة، تحتاج تعديلاً',ended:'⏹️ موقوفة نهائياً'};
+const DVN={d:'💻 كمبيوتر',t:'📱 تابلت',m:'📲 جوال'};
+const stName=c=>c.status==='active'&&!c.live&&c.pricing!=='daily'&&c.bal&&c.bal.remaining<=0.01?'✅ اكتملت':c.status==='active'&&!c.live?(c.start>new Date(Date.now()+108e5).toISOString().slice(0,10)?'🗓️ مقبولة، تبدأ '+c.start:'⚪ منتهية'):ST[c.status]||c.status;
 async function api(a,body={},auth=true){const r=await fetch('api/index.php?a='+a,{method:'POST',headers:{'Content-Type':'application/json',...(auth&&tok?{Authorization:'Bearer '+tok}:{})},body:JSON.stringify(body)});
   const j=await r.json().catch(()=>({ok:false,error:'الخادم لا يستجيب'}));if(r.status===401){tok=null;localStorage.removeItem('fz:advtoken');authView();throw new Error('auth')}if(!j.ok)throw new Error(j.error||'خطأ');return j}
 function authView(mode='login'){document.getElementById('hdr').innerHTML='';
@@ -87,9 +94,9 @@ const sn=()=>Object.fromEntries(ME.slots.map(s=>[s.slot,s.t]));
 function pkg(c){return c.pricing==='daily'?`👑 حجز حصري ${c.start} ← ${c.end}`:`📊 ${fmt(c.max_impr)} ظهور لكل مساحة، تبدأ ${c.start||'فوراً'}`}
 function dash(msg){const j=ME,cur=j.settings.currency,N=sn();
   app.innerHTML=`${msg||''}<div class="card"><h2>👋 أهلاً ${esc(j.adv.name)} · ${esc(j.adv.company)}</h2><button class="btn" id="nc">➕ حملة إعلانية جديدة</button></div>
-  <div class="card"><h2>📋 حملاتي</h2><div style="overflow:auto"><table><tr><th>الحملة</th><th>المساحات</th><th>الباقة</th><th>القيمة</th><th>الحالة</th><th>ظهور</th><th>نقرات</th></tr>
-  ${j.campaigns.map(c=>`<tr><td><a href="#c=${c.id}"><b>${esc(c.name)}</b></a></td><td>${c.slots.split(',').map(s=>esc(N[s]||s)).join('<br>')}</td><td>${pkg(c)}</td><td>${AdForm.money(c.price,cur)}</td>
-   <td><span class="st ${c.status}">${stName(c)}</span></td><td>${fmt(c.impr)}</td><td>${fmt(c.clicks)}</td></tr>`).join('')||'<tr><td colspan=7>لا توجد حملات بعد. ابدأ أول حملة الآن.</td></tr>'}</table></div><p class="note">اضغط اسم الحملة لترى تفاصيلها وحالتها.</p></div>`;
+  <div class="card"><h2>📋 حملاتي</h2><div style="overflow:auto"><table><tr><th>الحملة</th><th>المساحات</th><th>الباقة</th><th>القيمة</th><th>الرصيد المتبقي</th><th>الحالة</th><th>ظهور</th><th>نقرات</th></tr>
+  ${j.campaigns.map(c=>`<tr><td><a href="#c=${c.id}"><b>${esc(c.name)}</b></a></td><td>${c.slots.split(',').map(s=>esc(N[s]||s)).join('<br>')}</td><td>${pkg(c)}</td><td>${AdForm.money(c.price,cur)}</td><td>${c.bal?.paid?AdForm.money(c.bal.remaining,cur):'—'}</td>
+   <td><span class="st ${c.status}">${stName(c)}</span></td><td>${fmt(c.impr)}</td><td>${fmt(c.clicks)}</td></tr>`).join('')||'<tr><td colspan=8>لا توجد حملات بعد. ابدأ أول حملة الآن.</td></tr>'}</table></div><p class="note">اضغط اسم الحملة لترى تفاصيلها وحالتها.</p></div>`;
   app.querySelector('#nc').onclick=()=>form()}
 function detail(c){const cur=ME.settings.currency,N=sn();let cr={};try{cr=JSON.parse(c.creatives||'{}')}catch(e){}
   const steps=[['pending','⏳ المراجعة'],['awaiting','💳 السداد'],['active','🚀 التشغيل']],idx=c.status==='rejected'?0:c.status==='pending'?0:c.status==='awaiting'?1:2;
@@ -98,11 +105,17 @@ function detail(c){const cur=ME.settings.currency,N=sn();let cr={};try{cr=JSON.p
   ${c.status==='rejected'?`<div class="rej"><b>❌ سبب الرفض:</b> ${esc(c.note||'لم يُذكر سبب')}<br><button class="btn" id="ed" style="margin-top:10px">✏️ تعديل الحملة وإعادة الإرسال</button></div>`:''}
   ${c.status==='pending'?`<p class="note">نراجع إعلانك الآن، ويصلك بريد بالفاتورة عند الموافقة. يمكنك تعديل الحملة قبل المراجعة.</p><button class="btn alt" id="ed">✏️ تعديل</button> <button class="btn alt" id="del">🗑️ حذف الطلب</button>`:''}
   ${c.status==='awaiting'?`<p>✅ تمت الموافقة على إعلانك. سدّد الفاتورة لتبدأ الحملة.</p><a class="btn" href="invoice.html?t=${c.report_token}" target="_blank">📄 عرض الفاتورة ${esc(c.invoice_no)}</a>`:''}
-  ${['active','paused'].includes(c.status)?`<a class="btn" href="ad-report.html?t=${c.report_token}" target="_blank">📊 التقرير المباشر</a> ${c.invoice_no?`<a class="btn alt" href="invoice.html?t=${c.report_token}" target="_blank">📄 الفاتورة</a>`:''}`:''}</div>
-  <div class="card"><h2>📝 تفاصيل الحملة</h2><table><tr><td>المساحات</td><td>${c.slots.split(',').map(s=>esc(N[s]||s)).join('، ')}</td></tr><tr><td>الأقسام</td><td>${c.cats?c.cats.split(',').map(k=>CATS[k]||k).join('، '):'كل الموقع'}</td></tr>
+  ${['active','paused','ended'].includes(c.status)?`<a class="btn" href="ad-report.html?t=${c.report_token}" target="_blank">📊 التقرير المباشر</a> ${c.invoice_no?`<a class="btn alt" href="invoice.html?t=${c.report_token}" target="_blank">📄 الفاتورة</a>`:''}`:''}</div>
+  <div class="card"><h2>📝 تفاصيل الحملة</h2><table><tr><td style="width:130px">المساحات</td><td>${c.slots.split(',').map(s=>`<div class="ln">${esc(N[s]||s)}</div>`).join('')}</td></tr><tr><td>الأقسام</td><td>${c.cats?c.cats.split(',').map(k=>CATS[k]||k).join('، '):'كل الموقع'}</td></tr>
    <tr><td>الباقة</td><td>${pkg(c)}</td></tr><tr><td>القيمة</td><td><b>${AdForm.money(c.price,cur)}</b></td></tr><tr><td>الرابط</td><td dir="ltr"><a href="${esc(c.link)}" target="_blank" rel="noopener">${esc(c.link)}</a></td></tr>
-   <tr><td>الأداء</td><td>${fmt(c.impr)} ظهور · ${fmt(c.clicks)} نقرة</td></tr></table>
-   <h3>🖼️ صور الإعلان</h3><div class="imgs">${Object.entries(cr).map(([s,v])=>Object.entries(v).map(([d,u])=>`<figure><img src="${esc(u)}" alt=""><figcaption>${esc(N[s]||s)} · ${{d:'💻 كمبيوتر',t:'📱 تابلت',m:'📲 جوال'}[d]}</figcaption></figure>`).join('')).join('')}</div></div>`;
+   <tr><td>الأداء</td><td>${fmt(c.impr)} ظهور · ${fmt(c.clicks)} نقرة</td></tr></table></div>
+  ${c.bal?.paid?`<div class="card"><h2>💰 رصيد الحملة</h2><div class="bal"><div><span>قيمة الحملة</span><b>${AdForm.money(c.bal.price,cur)}</b></div><div><span>المستهلك</span><b>${AdForm.money(c.bal.consumed,cur)}</b></div>
+   <div class="rm"><span>${c.status==='ended'?'المبلغ المسترد':'الرصيد المتبقي'}</span><b>${AdForm.money(c.status==='ended'?c.bal.refund:c.bal.remaining,cur)}</b></div></div>
+   <div class="pbar"><i style="width:${Math.min(100,c.bal.consumed/Math.max(.01,c.bal.price)*100)}%"></i></div><p class="note">${c.pricing==='daily'?'في الحجز الحصري يُحتسب كل يوم يمر من أيام الحجز.':'يُحتسب الرصيد حسب مرات الظهور الفعلية لكل مساحة.'}</p></div>`:''}
+  <div class="card"><h2>🖼️ صور الإعلان وأداؤها</h2>${c.slots.split(',').map(s=>{const v=cr[s]||{},ss=c.slotStats?.[s]||{impr:0,clicks:0},b=c.bal?.slots?.[s];
+    return `<div class="sl"><div class="sl-h"><b>${esc(N[s]||s)}</b><span>${fmt(ss.impr)} ظهور · ${fmt(ss.clicks)} نقرة${b?(c.pricing==='daily'?` · ${b.daysUsed} من ${b.days} يوم`:` · المتبقي ${fmt(b.imprLeft)} ظهور`):''}</span></div>
+     ${Object.entries(v).map(([d,u])=>{const ds=c.dev?.[s]?.[d]||{impr:0,clicks:0};return `<div class="im"><img src="${esc(u)}" alt=""><div class="im-s"><b>${DVN[d]||d}</b><span>${fmt(ds.impr)} ظهور</span><span>${fmt(ds.clicks)} نقرة</span></div></div>`}).join('')}</div>`}).join('')}
+   <p class="note">أرقام كل صورة تُحسب حسب الجهاز الذي ظهرت عليه. الظهور قبل تفعيل هذه الميزة يظهر في مجموع المساحة فقط.</p></div>`;
   app.querySelector('#ed')?.addEventListener('click',()=>form(c));
   app.querySelector('#del')?.addEventListener('click',async()=>{if(!confirm('حذف طلب الحملة؟'))return;await api('adv_cancel',{id:c.id}).catch(e=>alert(e.message));location.hash='';route()})}
 async function form(c={}){const j=ME,S=j.settings,cur=S.currency,cr0={};try{Object.assign(cr0,JSON.parse(c.creatives||'{}'))}catch(e){}
