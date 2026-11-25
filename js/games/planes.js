@@ -11,6 +11,8 @@ function planeAudio(){if(!sound.on)return null;try{actx=actx||new(window.AudioCo
 function planeQuiz(TASKS,opt={}){return(root,c)=>{
   const idx=Math.min(TASKS.length-1,c.run.diff*10+c.run.stage-1),key=(opt.id||'')+':'+idx,diff=c.run.diff,rtl=!!opt.rtl;
   let task;for(let n=0;n<12;n++){task=TASKS[idx]();if(task.q!==PL_LAST[key])break}PL_LAST[key]=task.q;
+  /* نصوص المهام مكتوبة للبالونات، فنحوّلها للسحب هنا فقط (بدون تعديل ملف البالونات) */
+  task={...task,q:task.q.replace(/مجموعة البالونات (الثلاثة|الأربعة)/,'السحابة ذات الأرقام $1').replace(/البالونات/g,'السحب').replace(/بالون/g,'سحابة')};
   /* نفس الهدف والقلوب والوقت في لعبة البالونات: القلوب سهل 5، وسط 4، صعب 3 */
   const goal=task.group?c.fi(3,5):c.fi(6,12),secs=[60,55,55][diff]+(task.group?8:0);
   let score=0,wrong=0,lives=[5,4,3][diff],started=false,over=false,tb=null,au=null;
