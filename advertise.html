@@ -42,7 +42,7 @@ footer{text-align:center;color:#64748b;font-weight:600;padding:10px 16px 30px}
   <div class="top"><a class="brand" href="./"><img src="icon-192.png" alt="">فنتازيا</a><a class="back" href="./">↩ العودة للألعاب</a></div>
   <h1>أعلن في فنتازيا 📢</h1>
   <p>أوصل علامتك التجارية إلى العائلات العربية وأطفالهم من 3 إلى 12 سنة، في بيئة ألعاب آمنة وتعليمية يثق بها الأهل.</p>
-  <a class="btn" href="#contact">اطلب عرض أسعار</a>
+  <a class="btn" href="advertiser.html">🚀 أنشئ حملتك الآن</a> <a class="btn" href="#prices" style="background:#fff;box-shadow:0 6px 0 #c7d2fe">💰 الأسعار</a>
 </header>
 <main>
   <section class="card">
@@ -74,6 +74,12 @@ footer{text-align:center;color:#64748b;font-weight:600;padding:10px 16px 30px}
       <div class="p"><h3>📬 رعاية النشرة</h3><ul><li>ظهور في رسائل «جديد الألعاب» لأولياء الأمور الموافقين</li></ul></div>
     </div>
   </section>
+  <section class="card" id="prices">
+    <h2>💰 الأسعار</h2>
+    <p style="color:#555b85;line-height:1.8;margin-top:0">باقتان: <b>مرات الظهور</b> (تدفع لكل 1000 ظهور فعلي، ويتناوب إعلانك مع معلنين آخرين) أو <b>الحجز الحصري بالأيام</b> (إعلانك وحده في المساحة). لا يظهر معلنان في نفس الصفحة أبداً.</p>
+    <div style="overflow:auto"><table id="pt" style="width:100%;border-collapse:collapse;font-size:15px"><tr><td>جاري التحميل…</td></tr></table></div>
+    <p style="margin:14px 0 0"><a class="btn" href="advertiser.html">🚀 أنشئ حملتك واعرف السعر مباشرة</a></p>
+  </section>
   <section class="card">
     <h2>✅ شروط الإعلان</h2>
     <ul class="rules">
@@ -102,6 +108,8 @@ footer{text-align:center;color:#64748b;font-weight:600;padding:10px 16px 30px}
 </main>
 <footer>© فنتازيا 2026 · <a href="./">العودة للألعاب</a></footer>
 <script>
+fetch('api/index.php?a=adpricing').then(r=>r.json()).then(j=>{if(!j.ok)return;const c=j.settings.currency,m=v=>Number(v).toLocaleString('en-US')+' '+c;
+  document.getElementById('pt').innerHTML='<tr style="background:#f5f3ff"><th style="padding:10px;text-align:right">المساحة</th><th style="padding:10px;text-align:right">المقاسات</th><th style="padding:10px;text-align:right">1000 ظهور</th><th style="padding:10px;text-align:right">يوم حصري</th></tr>'+j.slots.map(s=>'<tr style="border-bottom:1px solid #eef1ff"><td style="padding:10px;font-weight:700">'+s.t+'</td><td style="padding:10px;color:#64748b;font-size:13px">'+s.size+'</td><td style="padding:10px">'+(s.price.cpm_on?m(s.price.cpm):'—')+'</td><td style="padding:10px">'+(s.price.daily_on?m(s.price.daily):'—')+'</td></tr>').join('')+(+j.settings.vat?'':'')}).catch(()=>{});
 fetch('api/index.php?a=pubstats').then(r=>r.json()).then(j=>{if(j.ok&&j.visitors30>=500){const v=document.getElementById('vis');v.querySelector('b').textContent='+'+j.visitors30.toLocaleString('en-US');v.hidden=false}}).catch(()=>{});
 const f=document.getElementById('f'),m=document.getElementById('msg');
 f.onsubmit=async e=>{e.preventDefault();m.className='';const d=Object.fromEntries(new FormData(f));
