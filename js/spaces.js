@@ -30,10 +30,11 @@
   }
 
   /* ---------- جلب الإعلانات ---------- */
+  let pageKeys = []; // المعلنون الظاهرون في الصفحة الحالية (لا يتكرر المعلن في الصفحة)
   async function fetchSlots(slots, cat) {
     if (!local) try {
-      const r = await fetch(`${API}?a=ads&s=${slots.join(',')}&c=${encodeURIComponent(cat || '')}`, { cache: 'no-store' });
-      const j = await r.json(); if (j.ok) return j.slots;
+      const r = await fetch(`${API}?a=ads&s=${slots.join(',')}&c=${encodeURIComponent(cat || '')}&x=${pageKeys.join(',')}`, { cache: 'no-store' });
+      const j = await r.json(); if (j.ok) { for (const s of Object.values(j.slots)) if (s.k) pageKeys.push(s.k); return j.slots; }
     } catch (e) {}
     return Object.fromEntries(slots.map((s) => [s, { type: s === 'between' ? 'off' : 'house' }])); // الخادم لا يستجيب: «أعلن هنا»
   }
@@ -111,12 +112,12 @@
   /* ---------- ربط الصفحات ---------- */
   let seq = 0;
   async function onHome(cat) {
-    hit(cat ? 'cat:' + cat : 'home');
+    hit(cat ? 'cat:' + cat : 'home'); pageKeys = [];
     const my = ++seq, s = await fetchSlots(['home_top'], cat); if (my !== seq) return;
     place('home_top', s.home_top, document.querySelector('#cats'));
   }
   async function onGame(g) {
-    hit('game:' + g.id);
+    hit('game:' + g.id); pageKeys = [];
     const my = ++seq, s = await fetchSlots(['game_below', 'game_side'], g.cat); if (my !== seq) return;
     place('game_below', s.game_below, document.querySelector('#stageWrap'));
     place('game_side', s.game_side, document.querySelector('.related h3'), 'beforebegin');
