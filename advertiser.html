@@ -37,6 +37,10 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 8px;t
 .rej{background:#fef2f2;border:2px solid #fecaca;border-radius:14px;padding:14px;line-height:1.8;margin:10px 0}
 .imgs{display:flex;flex-wrap:wrap;gap:10px}.imgs figure{margin:0;background:#f8fafc;border-radius:12px;padding:8px;max-width:320px}.imgs img{max-width:100%;max-height:140px;display:block;border-radius:8px}.imgs figcaption{font-size:12px;color:#64748b;margin-top:4px}
 .st.awaiting{background:#e0e7ff}
+.fg{margin-inline-start:12px;font-size:14px;font-weight:700}
+.terms{background:#f8fafc;border:2px solid #e2e6ff;border-radius:14px;padding:14px;margin:12px 0;display:flex;flex-direction:column;gap:8px}
+.terms label.chk{display:flex!important;align-items:flex-start;gap:8px;margin:0;line-height:1.7;font-weight:600!important;font-size:14px;cursor:pointer}.terms input{width:18px;height:18px;margin-top:4px;accent-color:#5b3cff;flex:none}
+.btn:disabled{opacity:.45;cursor:not-allowed}
 .chk{flex-direction:row!important;align-items:center;gap:6px;font-weight:600!important;display:inline-flex!important;margin:3px 10px 3px 0}
 </style>
 </head>
@@ -56,13 +60,27 @@ function authView(mode='login'){document.getElementById('hdr').innerHTML='';
   <div class="tabs"><button class="btn ${mode==='login'?'':'alt'}" data-m="login">تسجيل الدخول</button><button class="btn ${mode==='reg'?'':'alt'}" data-m="reg">حساب معلن جديد</button></div>
   <form id="af" class="frm">${mode==='reg'?'<label>اسمك<input name="name" required></label><label>الشركة / العلامة التجارية<input name="company" required></label><label class="full">رقم الجوال<input name="phone" dir="ltr" inputmode="tel"></label>':''}
   <label class="full">البريد الإلكتروني<input name="email" type="email" dir="ltr" required></label><label class="full">كلمة المرور${mode==='reg'?' (8 أحرف على الأقل)':''}<input name="password" type="password" dir="ltr" required></label>
-  <div class="full err" id="er"></div><div class="full"><button class="btn" type="submit">${mode==='reg'?'إنشاء الحساب':'دخول'}</button></div></form>
+  <div class="full err" id="er"></div><div class="full"><button class="btn" type="submit">${mode==='reg'?'إنشاء الحساب':'دخول'}</button>${mode==='login'?' <a href="#" id="fg" class="fg">نسيت كلمة المرور؟</a>':''}</div></form>
   <p class="note" style="margin-top:14px">ℹ️ حساب المعلن منفصل عن حساب اللاعب في الألعاب. يمكنك استخدام نفس البريد للاثنين بلا أي تعارض، وإذا دخلت حساب اللاعب بنفس البريد يظهر لك زر «بوابة المعلنين» في لوحته.</p></div>`;
   app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>authView(b.dataset.m));
+  app.querySelector('#fg')?.addEventListener('click',e=>{e.preventDefault();forgotView(app.querySelector('[name=email]').value)});
   app.querySelector('#af').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));try{const j=await api(mode==='reg'?'adv_register':'adv_login',d,false);tok=j.token;localStorage.setItem('fz:advtoken',tok);route()}catch(er){app.querySelector('#er').textContent=er.message}}}
+function forgotView(email=''){document.getElementById('hdr').innerHTML='';
+  app.innerHTML=`<div class="card" style="max-width:540px;margin:20px auto"><h2>🔑 استعادة كلمة المرور</h2><p class="note">اكتب بريدك المسجّل كمعلن، وسنرسل لك رابطاً لاختيار كلمة مرور جديدة (صالح ساعة واحدة).</p>
+  <form id="ff" class="frm"><label class="full">البريد الإلكتروني<input name="email" type="email" dir="ltr" required value="${esc(email)}"></label><div class="full err" id="er"></div>
+  <div class="full"><button class="btn" type="submit">إرسال الرابط</button> <button class="btn alt" type="button" id="bk">رجوع</button></div></form></div>`;
+  app.querySelector('#bk').onclick=()=>authView();
+  app.querySelector('#ff').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('[type=submit]');b.disabled=true;
+    try{await api('adv_forgot',{email:e.target.email.value},false);app.querySelector('.card').innerHTML=`<h2 class="ok">📧 تحقق من بريدك</h2><p>إذا كان <b dir="ltr">${esc(e.target.email.value)}</b> مسجّلاً كمعلن فسيصلك رابط إعادة التعيين خلال دقائق.</p><p class="note">لم يصلك؟ تحقق من مجلد الرسائل غير المرغوب فيها (Junk / Spam).</p><button class="btn alt" onclick="authView()">رجوع لتسجيل الدخول</button>`}
+    catch(er){app.querySelector('#er').textContent=er.message;b.disabled=false}}}
+function resetView(t){document.getElementById('hdr').innerHTML='';
+  app.innerHTML=`<div class="card" style="max-width:540px;margin:20px auto"><h2>🔑 كلمة مرور جديدة</h2><form id="rf" class="frm"><label class="full">كلمة المرور الجديدة (8 أحرف على الأقل)<input name="p1" type="password" dir="ltr" required></label>
+  <label class="full">تأكيد كلمة المرور<input name="p2" type="password" dir="ltr" required></label><div class="full err" id="er"></div><div class="full"><button class="btn" type="submit">حفظ والدخول</button></div></form></div>`;
+  app.querySelector('#rf').onsubmit=async e=>{e.preventDefault();const f=e.target,er=app.querySelector('#er');if(f.p1.value!==f.p2.value)return er.textContent='كلمتا المرور غير متطابقتين';
+    try{const j=await api('adv_reset',{token:t,password:f.p1.value},false);tok=j.token;localStorage.setItem('fz:advtoken',tok);history.replaceState(null,'',location.pathname);route()}catch(x){er.textContent=x.message}}}
 async function load(){ME=await api('adv_me');document.getElementById('hdr').innerHTML='<button id="lo">خروج</button>';
   document.getElementById('lo').onclick=async()=>{await api('adv_logout').catch(()=>{});tok=null;localStorage.removeItem('fz:advtoken');location.hash='';authView()};return ME}
-async function route(){if(!tok)return authView();try{await load()}catch(e){if(e.message!=='auth')app.innerHTML=`<div class="card err">${esc(e.message)}</div>`;return}
+async function route(){const rs=location.hash.match(/^#reset=([a-f0-9]{48})/);if(rs)return resetView(rs[1]);if(!tok)return authView();try{await load()}catch(e){if(e.message!=='auth')app.innerHTML=`<div class="card err">${esc(e.message)}</div>`;return}
   const m=location.hash.match(/^#c=(\d+)/);if(m){const c=ME.campaigns.find(x=>x.id==m[1]);if(c)return detail(c)}dash()}
 addEventListener('hashchange',route);
 const sn=()=>Object.fromEntries(ME.slots.map(s=>[s.slot,s.t]));
@@ -105,8 +123,12 @@ async function form(c={}){const j=ME,S=j.settings,cur=S.currency,cr0={};try{Obje
    <label style="margin-top:10px">رابط موقعك أو صفحة المنتج<input name="link" dir="ltr" value="${esc(c.link)}" placeholder="https://"></label>
    <label style="margin-top:10px">وصف قصير للإعلان (يُقرأ لضعاف البصر)<input name="alt" value="${esc(c.alt)}"></label></section>
   <section class="card blk"><h3><span class="num">4</span> الإرسال</h3><div id="sum"></div>
-   <p class="note">✅ نراجع كل إعلان قبل نشره: يجب أن يكون مناسباً للأطفال والعائلات، والخروج من الموقع عبر إعلانك يمر ببوابة الأهل.<br>📄 بعد الموافقة نرسل لك فاتورة إلكترونية، وبعد السداد نفعّل حملتك.</p>
-   <div class="err" id="er"></div><button class="btn" type="submit">📨 إرسال الحملة للمراجعة</button> <button class="btn alt" type="button" id="bk">رجوع</button></section></form>`;
+   <div class="terms"><b>شروط الإعلان (يجب الموافقة عليها جميعاً)</b>
+    <label class="chk"><input type="checkbox" class="tm"> أقرّ بأن الإعلان مناسب للأطفال والعائلات، ولا يحتوي محتوى مقيّداً بالعمر أو مضللاً.</label>
+    <label class="chk"><input type="checkbox" class="tm"> أعلم أن فنتازيا تراجع كل إعلان قبل نشره، وأن <b>للمنصة الحق في قبول أو رفض أي إعلان</b>.</label>
+    <label class="chk"><input type="checkbox" class="tm"> أعلم أن الخروج من الموقع عبر إعلاني يمر ببوابة الأهل.</label>
+    <label class="chk"><input type="checkbox" class="tm"> أعلم أن الحملة تبدأ بعد الموافقة عليها وسداد الفاتورة الإلكترونية.</label></div>
+   <div class="err" id="er"></div><button class="btn" type="submit" disabled title="وافق على الشروط أولاً">📨 إرسال الحملة للمراجعة</button> <button class="btn alt" type="button" id="bk">رجوع</button></section></form>`;
   const f=app.querySelector('#cf'),err=m=>app.querySelector('#er').textContent=m||'';
   const getSel=AdForm.slotPicker(app.querySelector('#sb'),j.slots,(c.slots||'').split(','),{showPrice:true,currency:cur,onChange:()=>{crs.draw();cal.set({booked:booked()});quote()}});
   const getCats=AdForm.catsPicker(app.querySelector('#cb'),CATS,(c.cats||'').split(','));
@@ -124,12 +146,13 @@ async function form(c={}){const j=ME,S=j.settings,cur=S.currency,cr0={};try{Obje
     catch(e){lastQ=null;sum.innerHTML='';if(e.message!=='auth')app.querySelector('#qb').innerHTML=AdForm.quoteHTML(null,e.message)}},250)};
   f.querySelectorAll('[name=pricing]').forEach(x=>x.addEventListener('change',()=>{cal.set({mode:mode(),end:''});quote()}));f.impr?.addEventListener('change',quote);quote();
   app.querySelector('#bk').onclick=()=>{location.hash='';route()};
+  const tms=[...app.querySelectorAll('.tm')],sb=f.querySelector('[type=submit]');tms.forEach(t=>t.onchange=()=>{sb.disabled=!tms.every(x=>x.checked)});
   f.onsubmit=async e=>{e.preventDefault();err();const fd=new FormData(f),d=cal.get(),cats=getCats();
     if(!getSel().length)return err('اختر مساحة إعلانية');if(cats===null)return err('اختر قسماً واحداً على الأقل، أو «الكل»');if(!lastQ)return err('أكمل اختيار الباقة والتاريخ');
     const b=f.querySelector('[type=submit]');b.disabled=true;b.textContent='⏳ جاري الإرسال…';
-    try{const r=await api('adv_save',{id:c.id||0,name:app.querySelector('#nm').value,slots:getSel(),cats,pricing:fd.get('pricing')||'cpm',impr:+fd.get('impr'),start:d.start,end:fd.get('pricing')==='daily'?d.end:'',creatives:crs.value(),link:fd.get('link'),alt:fd.get('alt')});
+    try{const r=await api('adv_save',{id:c.id||0,name:app.querySelector('#nm').value,slots:getSel(),cats,pricing:fd.get('pricing')||'cpm',impr:+fd.get('impr'),start:d.start,end:fd.get('pricing')==='daily'?d.end:'',creatives:crs.value(),link:fd.get('link'),alt:fd.get('alt'),terms:tms.every(x=>x.checked)});
       scrollTo(0,0);await load();location.hash='c='+r.id;}
-    catch(er){if(er.message!=='auth'){err(er.message);b.disabled=false;b.textContent='📨 إرسال الحملة للمراجعة'}}}}
+    catch(er){if(er.message!=='auth'){err(er.message);b.disabled=!tms.every(x=>x.checked);b.textContent='📨 إرسال الحملة للمراجعة'}}}}
 route();
 </script>
 </body>
