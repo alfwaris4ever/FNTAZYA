@@ -394,7 +394,11 @@ switch ($a) {
     $s = db()->prepare('SELECT slot, SUM(impr) impr, SUM(clicks) clicks FROM ad_stats WHERE cid=? GROUP BY slot'); $s->execute([$c['id']]);
     out(['ok' => true, 'campaign' => ['name' => $c['name'], 'advertiser' => $c['advertiser'], 'start' => $c['start'], 'end' => $c['end'], 'status' => $c['status'], 'live' => isLive($c),
       'pricing' => $c['pricing'], 'booked' => (int)$c['max_impr']],
-      'totals' => campaignTotals((int)$c['id']), 'daily' => $d->fetchAll(), 'slots' => $s->fetchAll(), 'slotNames' => array_map(fn($x) => $x['t'], AD_SLOTS)]);
+      'totals' => campaignTotals((int)$c['id']), 'daily' => $d->fetchAll(), 'slots' => (function () use ($s, $c) { // كل المساحات المحجوزة حتى لو لم تُعرض بعد
+        $have = []; foreach ($s->fetchAll() as $r) $have[$r['slot']] = $r; $o = [];
+        foreach (array_filter(explode(',', (string)$c['slots'])) as $k) $o[] = $have[$k] ?? ['slot' => $k, 'impr' => 0, 'clicks' => 0];
+        foreach ($have as $k => $r) if (!in_array($k, array_column($o, 'slot'), true)) $o[] = $r;
+        return $o; })(), 'slotNames' => array_map(fn($x) => $x['t'], AD_SLOTS)]);
   }
 
   case 'ad_booked': { // أيام الحجز الحصري لكل مساحة (للتقويم)
