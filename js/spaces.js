@@ -33,7 +33,7 @@
   let pageKeys = []; // المعلنون الظاهرون في الصفحة الحالية (لا يتكرر المعلن في الصفحة)
   async function fetchSlots(slots, cat) {
     if (!local) try {
-      const r = await fetch(`${API}?a=ads&s=${slots.join(',')}&c=${encodeURIComponent(cat || '')}&x=${pageKeys.join(',')}`, { cache: 'no-store' });
+      const r = await fetch(`${API}?a=ads&s=${slots.join(',')}&c=${encodeURIComponent(cat || '')}&x=${pageKeys.join(',')}&w=${innerWidth}`, { cache: 'no-store' });
       const j = await r.json(); if (j.ok) { for (const s of Object.values(j.slots)) if (s.k) pageKeys.push(s.k); return j.slots; }
     } catch (e) {}
     return Object.fromEntries(slots.map((s) => [s, { type: s === 'between' ? 'off' : 'house' }])); // الخادم لا يستجيب: «أعلن هنا»
@@ -48,7 +48,7 @@
     for (const en of ents) {
       const el = en.target;
       if (en.isIntersecting && en.intersectionRatio >= 0.5) {
-        if (!el._vt) el._vt = setTimeout(() => { io.unobserve(el); if (!document.hidden && el.isConnected) { queue.push({ c: +el.dataset.cid, s: el.dataset.slot }); clearTimeout(flushT); flushT = setTimeout(flush, 3000); } }, 1000);
+        if (!el._vt) el._vt = setTimeout(() => { io.unobserve(el); if (!document.hidden && el.isConnected) { queue.push({ c: +el.dataset.cid, s: el.dataset.slot, d: el.dataset.dev || '' }); clearTimeout(flushT); flushT = setTimeout(flush, 3000); } }, 1000);
       } else { clearTimeout(el._vt); el._vt = 0; }
     }
   }, { threshold: [0, 0.5] }) : null;
@@ -92,8 +92,10 @@
       el.classList.add('has-img'); if (!ad.img_t) el.classList.add('no-t'); if (!ad.img_m) el.classList.add('no-m');
       const src = (u, mq) => (u ? `<source media="${mq}" srcset="${esc(u)}">` : '');
       el.insertAdjacentHTML('beforeend', `<a class="fz-sp-img" href="${esc(ad.click || '#')}" rel="sponsored noopener nofollow"><picture>${src(ad.img_m, '(max-width:600px)')}${src(ad.img_t, '(max-width:1023px)')}<img src="${esc(ad.img)}" alt="${esc(ad.alt || 'إعلان')}" decoding="async"></picture></a>`);
+      // أي صورة تظهر فعلاً على هذا الجهاز (لإحصاء كل صورة على حدة)
+      el.dataset.dev = ad.img_m && innerWidth <= 600 ? 'm' : ad.img_t && innerWidth <= 1023 ? 't' : 'd';
       el.querySelector('.fz-sp-img').prepend(el.querySelector('.fz-sp-tag'));
-      el.querySelector('a').addEventListener('click', (e) => { e.preventDefault(); if (!ad.click) return; let u = ad.click; try { u = new URL(ad.click, location.href).href; } catch (er) {} parentGate(u); });
+      el.querySelector('a').addEventListener('click', (e) => { e.preventDefault(); if (!ad.click) return; let u = ad.click + '&d=' + el.dataset.dev; try { u = new URL(ad.click, location.href).href; } catch (er) {} parentGate(u); });
       io?.observe(el);
     } else if ((ad.type === 'html' || ad.type === 'network') && ad.html) {
       if (ad.cid) { el.dataset.cid = ad.cid; io?.observe(el); }

@@ -46,7 +46,7 @@ async function loadTraffic(days = 30) {
 
 let ADM_ADS = null;
 const crOf = (c) => { let cr = {}; try { cr = JSON.parse(c.creatives || '{}') || {}; } catch (e) {} for (const s of (c.slots || '').split(',').filter(Boolean)) if (!cr[s] && c.img) cr[s] = { d: c.img }; return cr; };
-const STATUS = { pending: '⏳ بانتظار المراجعة', awaiting: '💳 بانتظار السداد', active: '🟢 تعمل', paused: '⏸️ موقوفة', rejected: '❌ مرفوضة' };
+const STATUS = { pending: '⏳ بانتظار المراجعة', awaiting: '💳 بانتظار السداد', active: '🟢 تعمل', paused: '⏸️ موقوفة', rejected: '❌ مرفوضة', ended: '⏹️ موقوفة نهائياً' };
 function campStatus(c) { if (c.status === 'active' && !c.live) return '⚪ منتهية / خارج الفترة'; return STATUS[c.status] || c.status; }
 function pkgText(c) { return c.ctype === 'filler' ? 'رديف' : c.pricing === 'daily' ? `حصري ${c.start} ← ${c.end}` : `${fmt(c.max_impr)} ظهور${c.start ? ` من ${c.start}` : ''}`; }
 function thumbs(c) { return c.kind === 'image' ? Object.values(crOf(c)).map((v) => { const u = v.d || v.t || v.m; return u ? `<img src="${esc(u)}" class="thumb" alt="">` : ''; }).join('') : '🧩'; }
@@ -71,10 +71,10 @@ async function loadAds() {
   <p class="note">المسار: المعلن ينشئ حملته من <a href="advertiser.html" target="_blank">بوابة المعلنين</a> ← تراجعها وتضغط «✅ قبول وإرسال الفاتورة» فتصله فاتورة إلكترونية ← بعد وصول السداد تضغط «💰 تم السداد وتفعيل» فتبدأ الحملة ويصله رابط التقرير. وعند الرفض يصله السبب ويعدّل حملته ويعيد إرسالها.</p>
 
   <h2 style="margin-top:22px">🎯 حملات المعلنين <button id="newC">➕ حملة يدوية</button></h2>
-  <table><tr><th>الحملة</th><th>المعلن</th><th>المساحات</th><th>الباقة</th><th>القيمة</th><th>الحالة</th><th>ظهور</th><th>نقرات</th><th>CTR</th><th>تحكم</th></tr>
-  ${paid.map((c) => `<tr><td>${thumbs(c)} <b>${esc(c.name)}</b></td><td>${advCell(c)}</td><td>${slotsCell(c)}</td><td class="sub">${pkgText(c)}${c.pricing === 'cpm' && +c.max_impr ? `<div class="pbar"><i style="width:${Math.min(100, (c.impr / c.max_impr) * 100)}%"></i></div>` : ''}</td><td>${AdForm.money(c.price, cur)}</td>
+  <table><tr><th>الحملة</th><th>المعلن</th><th>المساحات</th><th>الباقة</th><th>القيمة</th><th>الرصيد المتبقي</th><th>الحالة</th><th>ظهور</th><th>نقرات</th><th>CTR</th><th>تحكم</th></tr>
+  ${paid.map((c) => `<tr><td>${thumbs(c)} <b>${esc(c.name)}</b></td><td>${advCell(c)}</td><td>${slotsCell(c)}</td><td class="sub">${pkgText(c)}${c.pricing === 'cpm' && +c.max_impr ? `<div class="pbar"><i style="width:${Math.min(100, (c.impr / c.max_impr) * 100)}%"></i></div>` : ''}</td><td>${AdForm.money(c.price, cur)}</td><td>${c.bal?.paid ? (c.status === 'ended' ? `<span class="sub">مسترد ${AdForm.money(c.bal.refund, cur)}</span>` : `<b>${AdForm.money(c.bal.remaining, cur)}</b><div class="sub">مستهلك ${AdForm.money(c.bal.consumed, cur)}</div>`) : '—'}</td>
     <td>${campStatus(c)}${c.note ? `<div class="sub">${esc(c.note)}</div>` : ''}</td><td>${fmt(c.impr)}</td><td>${fmt(c.clicks)}</td><td>${ctr(c.impr, c.clicks)}</td>
-    <td style="white-space:nowrap"><button class="sm" data-edit="${c.id}" title="تعديل">✏️</button>${['active', 'paused'].includes(c.status) ? `<button class="sm" data-toggle="${c.id}" title="${c.status === 'paused' ? 'تشغيل' : 'إيقاف'}">${c.status === 'paused' ? '▶️' : '⏸️'}</button>` : ''}<button class="sm" data-rep="${esc(c.report_token)}" title="نسخ رابط تقرير المعلن">📊</button><button class="sm del" data-del="${c.id}" title="حذف">🗑️</button></td></tr>`).join('') || '<tr><td colspan=10>لا توجد حملات بعد</td></tr>'}</table>
+    <td style="white-space:nowrap"><button class="sm" data-edit="${c.id}" title="تعديل">✏️</button>${['active', 'paused'].includes(c.status) ? `<button class="sm" data-toggle="${c.id}" title="${c.status === 'paused' ? 'تشغيل' : 'إيقاف'}">${c.status === 'paused' ? '▶️' : '⏸️'}</button>` : ''}${['active', 'paused'].includes(c.status) && c.bal?.paid ? `<button class="sm" data-end="${c.id}" title="إيقاف نهائي وإرجاع الرصيد المتبقي">⏹️</button>` : ''}<button class="sm" data-rep="${esc(c.report_token)}" title="نسخ رابط تقرير المعلن">📊</button><button class="sm del" data-del="${c.id}" title="حذف">🗑️</button></td></tr>`).join('') || '<tr><td colspan=11>لا توجد حملات بعد</td></tr>'}</table>
 
   <h2 style="margin-top:22px">🧩 الإعلانات الرديفة <button id="newF">➕ إعلان رديف</button></h2>
   <p class="note">إعلانات الموقع نفسه بأقل أولوية: تظهر فقط حين لا يوجد معلن متاح للمساحة، أو حين يكون المعلن نفسه ظاهراً في مساحة أخرى بالصفحة. لا يمكن حذفها، ويمكن تعديلها أو إيقافها.</p>
@@ -119,6 +119,10 @@ async function loadAds() {
     await admApi('adm_ad_decide', { id: c.id, decision: 'paid' }).catch((e) => alert(e.message)); loadAds(); }));
   app.querySelectorAll('[data-no]').forEach((b) => (b.onclick = async () => { const note = prompt('سبب الرفض (يصل للمعلن ليعدّل حملته):', ''); if (note === null) return;
     await admApi('adm_ad_decide', { id: +b.dataset.no, decision: 'reject', note }).catch((e) => alert(e.message)); loadAds(); }));
+  app.querySelectorAll('[data-end]').forEach((b) => (b.onclick = async () => { const c = find(b.dataset.end);
+    const v = prompt(`إيقاف حملة «${c.name}» نهائياً.\nالمستهلك: ${AdForm.money(c.bal.consumed, cur)}\nالمبلغ المسترد للمعلن (يمكنك تعديله):`, c.bal.remaining); if (v === null) return;
+    const note = prompt('ملاحظة تصل للمعلن (اختياري):', '') ?? '';
+    try { const r = await admApi('adm_ad_end', { id: c.id, refund: v, note }); alert(`تم إيقاف الحملة. المبلغ المسترد: ${AdForm.money(r.refund, cur)}`); } catch (e) { alert(e.message); } loadAds(); }));
   app.querySelectorAll('[data-rep]').forEach((b) => (b.onclick = async () => { const u = location.origin + '/ad-report.html?t=' + b.dataset.rep; try { await navigator.clipboard.writeText(u); b.textContent = '✅'; } catch (e) { prompt('رابط تقرير المعلن:', u); } }));
   app.querySelectorAll('[data-slot]').forEach((b) => (b.onclick = () => slotForm(j.slots.find((s) => s.slot === b.dataset.slot))));
   app.querySelector('#saveTxt').onclick = async (e) => { try { await admApi('adm_adstxt', { txt: app.querySelector('#adstxt').value }); e.target.textContent = '✅ تم الحفظ'; } catch (er) { alert(er.message); } };
