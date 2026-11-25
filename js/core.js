@@ -13,7 +13,11 @@ function beep(f=600,d=.12,type='sine',v=.15){if(!sound.on)return;try{actx=actx||
 const sfx={good(){beep(660,.1);setTimeout(()=>beep(880,.15),90)},bad(){beep(170,.25,'square',.07)},pop(){beep(900,.06,'triangle')},win(){[523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.2),i*120))}};
 let arVoice=null;const pickVoice=()=>{const v=speechSynthesis.getVoices();arVoice=v.find(x=>/^ar[-_]SA/i.test(x.lang))||v.find(x=>/^ar/i.test(x.lang))||null};
 if('speechSynthesis' in window){pickVoice();speechSynthesis.addEventListener?.('voiceschanged',pickVoice)}
-function speak(w){if(!sound.on||!('speechSynthesis' in window))return;const u=new SpeechSynthesisUtterance(w);u.lang='ar-SA';if(arVoice)u.voice=arVoice;u.rate=.85;speechSynthesis.cancel();speechSynthesis.speak(u)}
+/* الأرقام والرموز تُقرأ بالعربي، وإذا لم يوجد صوت عربي في الجهاز لا نقرأ شيئاً (بدل أن يُقرأ بالإنجليزي) */
+const AR_ONES=['صفر','واحد','اثنان','ثلاثة','أربعة','خمسة','ستة','سبعة','ثمانية','تسعة','عشرة','أحد عشر','اثنا عشر','ثلاثة عشر','أربعة عشر','خمسة عشر','ستة عشر','سبعة عشر','ثمانية عشر','تسعة عشر'],AR_TENS=['','','عشرون','ثلاثون','أربعون','خمسون','ستون','سبعون','ثمانون','تسعون'],AR_HUN=['','مئة','مئتان','ثلاثمئة','أربعمئة','خمسمئة','ستمئة','سبعمئة','ثمانمئة','تسعمئة'];
+function arNum(n){if(n<20)return AR_ONES[n];if(n<100){const o=n%10,t=AR_TENS[Math.floor(n/10)];return o?AR_ONES[o]+' و'+t:t}if(n<1000){const h=AR_HUN[Math.floor(n/100)],r=n%100;return r?h+' و'+arNum(r):h}return String(n)}
+const arSpeech=w=>String(w).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\d+/g,n=>' '+arNum(+n)+' ').replace(/\+/g,' زائد ').replace(/[−-]/g,' ناقص ').replace(/×/g,' ضرب ').replace(/÷/g,' تقسيم ').replace(/=/g,' يساوي ').replace(/_/g,' فراغ ').replace(/\s+/g,' ').trim();
+function speak(w){if(!sound.on||!('speechSynthesis' in window))return;if(!arVoice){pickVoice();if(!arVoice)return}const u=new SpeechSynthesisUtterance(arSpeech(w));u.lang='ar-SA';if(arVoice)u.voice=arVoice;u.rate=.85;speechSynthesis.cancel();speechSynthesis.speak(u)}
 
 /* ---------- difficulty & stages ---------- */
 const DIFFS=[
