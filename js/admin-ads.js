@@ -46,29 +46,29 @@ async function loadTraffic(days = 30) {
 
 let ADM_ADS = null;
 const crOf = (c) => { let cr = {}; try { cr = JSON.parse(c.creatives || '{}') || {}; } catch (e) {} for (const s of (c.slots || '').split(',').filter(Boolean)) if (!cr[s] && c.img) cr[s] = { d: c.img }; return cr; };
-const STATUS = { pending: '⏳ بانتظار الدفع', active: '🟢 تعمل', paused: '⏸️ موقوفة', rejected: '❌ مرفوضة' };
+const STATUS = { pending: '⏳ بانتظار المراجعة', awaiting: '💳 بانتظار السداد', active: '🟢 تعمل', paused: '⏸️ موقوفة', rejected: '❌ مرفوضة' };
 function campStatus(c) { if (c.status === 'active' && !c.live) return '⚪ منتهية / خارج الفترة'; return STATUS[c.status] || c.status; }
-function pkgText(c) { return c.ctype === 'filler' ? 'رديف' : c.pricing === 'daily' ? `حصري ${c.start} ← ${c.end}` : `${fmt(c.max_impr)} ظهور${c.end ? ` حتى ${c.end}` : ''}`; }
+function pkgText(c) { return c.ctype === 'filler' ? 'رديف' : c.pricing === 'daily' ? `حصري ${c.start} ← ${c.end}` : `${fmt(c.max_impr)} ظهور${c.start ? ` من ${c.start}` : ''}`; }
 function thumbs(c) { return c.kind === 'image' ? Object.values(crOf(c)).map((v) => { const u = v.d || v.t || v.m; return u ? `<img src="${esc(u)}" class="thumb" alt="">` : ''; }).join('') : '🧩'; }
 
 async function loadAds() {
   app.innerHTML = tabsBar('#ads') + '<div class="msg">جاري التحميل…</div>';
   try { ADM_ADS = await admApi('adm_ads'); } catch (e) { if (e.message !== 'auth') app.innerHTML = tabsBar('#ads') + `<div class="msg">${esc(e.message)}</div>`; return; }
   const j = ADM_ADS, S = j.settings, cur = S.currency, slotName = Object.fromEntries(j.slots.map((s) => [s.slot, s.t]));
-  const pending = j.campaigns.filter((c) => c.status === 'pending'), paid = j.campaigns.filter((c) => c.ctype !== 'filler' && c.status !== 'pending'), fill = j.campaigns.filter((c) => c.ctype === 'filler');
+  const pending = j.campaigns.filter((c) => c.status === 'pending' || c.status === 'awaiting'), paid = j.campaigns.filter((c) => c.ctype !== 'filler' && !['pending', 'awaiting'].includes(c.status)), fill = j.campaigns.filter((c) => c.ctype === 'filler');
   const rev = paid.filter((c) => c.status !== 'rejected').reduce((s, c) => s + +c.price, 0);
   const ti = paid.reduce((s, c) => s + c.impr, 0), tc = paid.reduce((s, c) => s + c.clicks, 0);
   const slotsCell = (c) => c.slots.split(',').map((s) => `<span class="chip">${esc(slotName[s] || s)}</span>`).join(' ') + (c.cats ? `<div class="sub">${c.cats.split(',').map((x) => ADM_CATS[x] || x).join('، ')}</div>` : '');
   const advCell = (c) => `${esc(c.advertiser)}${c.adv_email ? `<div class="sub" dir="ltr"><a href="mailto:${esc(c.adv_email)}">${esc(c.adv_email)}</a> ${esc(c.adv_phone || '')}</div>` : ''}`;
   app.innerHTML = tabsBar('#ads') + `
-  <div class="cards"><div class="card"><b>${pending.length}</b><span>بانتظار الموافقة</span></div><div class="card"><b>${paid.filter((c) => c.live).length}</b><span>حملة مدفوعة تعمل</span></div>
+  <div class="cards"><div class="card"><b>${pending.filter((c) => c.status === 'pending').length}</b><span>بانتظار المراجعة</span></div><div class="card"><b>${pending.filter((c) => c.status === 'awaiting').length}</b><span>بانتظار السداد</span></div><div class="card"><b>${paid.filter((c) => c.live).length}</b><span>حملة مدفوعة تعمل</span></div>
    <div class="card"><b>${AdForm.money(rev, cur)}</b><span>قيمة الحملات المعتمدة</span></div><div class="card"><b>${fmt(ti)}</b><span>ظهور مدفوع</span></div><div class="card"><b>${ctr(ti, tc)}</b><span>نسبة النقر CTR</span></div><div class="card"><b>${j.advertisers}</b><span>حساب معلن</span></div></div>
 
-  <h2>⏳ حملات بانتظار الدفع والموافقة (${pending.length})</h2>
-  <table><tr><th>الحملة</th><th>المعلن</th><th>المساحات</th><th>الباقة</th><th>القيمة</th><th>تحكم</th></tr>
-  ${pending.map((c) => `<tr><td>${thumbs(c)} <b>${esc(c.name)}</b><div class="sub">${new Date(c.created * 1000).toLocaleDateString('ar-SA-u-nu-latn')}</div></td><td>${advCell(c)}</td><td>${slotsCell(c)}</td><td class="sub">${pkgText(c)}</td><td><b>${AdForm.money(c.price, cur)}</b></td>
-    <td style="white-space:nowrap"><button class="sm" data-edit="${c.id}" title="مراجعة الإعلان">👁️</button><button class="sm" data-ok="${c.id}" title="تم الدفع: تفعيل الحملة">✅ تم الدفع</button><button class="sm del" data-no="${c.id}" title="رفض">❌</button></td></tr>`).join('') || '<tr><td colspan=6>لا توجد طلبات جديدة</td></tr>'}</table>
-  <p class="note">المعلن ينشئ حملته من <a href="advertiser.html" target="_blank">بوابة المعلنين</a> وتصله طريقة الدفع. بعد استلام المبلغ اضغط «✅ تم الدفع» فتبدأ الحملة ويصله بريد بالتفعيل ورابط التقرير.</p>
+  <h2>⏳ حملات بانتظار المراجعة أو السداد (${pending.length})</h2>
+  <table><tr><th>الحملة</th><th>المعلن</th><th>المساحات</th><th>الباقة</th><th>القيمة</th><th>الحالة</th><th>تحكم</th></tr>
+  ${pending.map((c) => `<tr><td>${thumbs(c)} <b>${esc(c.name)}</b><div class="sub">${new Date(c.created * 1000).toLocaleDateString('ar-SA-u-nu-latn')}</div></td><td>${advCell(c)}</td><td>${slotsCell(c)}</td><td class="sub">${pkgText(c)}</td><td><b>${AdForm.money(c.price, cur)}</b></td><td>${STATUS[c.status]}${c.invoice_no ? `<div class="sub">فاتورة ${esc(c.invoice_no)}</div>` : ''}</td>
+    <td style="white-space:nowrap"><button class="sm" data-edit="${c.id}" title="مراجعة الإعلان">👁️</button>${c.status === 'pending' ? `<button class="sm" data-ok="${c.id}" title="قبول الإعلان وإرسال الفاتورة للمعلن">✅ قبول وإرسال الفاتورة</button>` : `<a class="sm" style="text-decoration:none;padding:5px 8px;border-radius:10px;background:#eef1ff;color:#1d2350" href="invoice.html?t=${esc(c.report_token)}" target="_blank" title="الفاتورة">📄</a><button class="sm" data-paid="${c.id}" title="وصل السداد: تفعيل الحملة">💰 تم السداد وتفعيل</button>`}<button class="sm del" data-no="${c.id}" title="رفض مع ذكر السبب">❌</button></td></tr>`).join('') || '<tr><td colspan=7>لا توجد طلبات جديدة</td></tr>'}</table>
+  <p class="note">المسار: المعلن ينشئ حملته من <a href="advertiser.html" target="_blank">بوابة المعلنين</a> ← تراجعها وتضغط «✅ قبول وإرسال الفاتورة» فتصله فاتورة إلكترونية ← بعد وصول السداد تضغط «💰 تم السداد وتفعيل» فتبدأ الحملة ويصله رابط التقرير. وعند الرفض يصله السبب ويعدّل حملته ويعيد إرسالها.</p>
 
   <h2 style="margin-top:22px">🎯 حملات المعلنين <button id="newC">➕ حملة يدوية</button></h2>
   <table><tr><th>الحملة</th><th>المعلن</th><th>المساحات</th><th>الباقة</th><th>القيمة</th><th>الحالة</th><th>ظهور</th><th>نقرات</th><th>CTR</th><th>تحكم</th></tr>
@@ -91,7 +91,10 @@ async function loadAds() {
     <td class="sub">${sug ? `اليوم الحصري ≈ ${AdForm.money(sug, cur)}<br>(${fmt(s.avg)} ظهور × CPM + 30% علاوة الحصرية)` : 'يظهر بعد تجمّع بيانات الزيارات'}</td></tr>`; }).join('')}</table>
   <div class="frm" style="margin-top:12px"><label>العملة<input name="currency" value="${esc(S.currency)}"></label><label>ضريبة القيمة المضافة %<input type="number" min="0" max="30" name="vat" value="${esc(S.vat)}"></label>
    <label>أقل عدد مرات ظهور للحملة<input type="number" min="1000" step="1000" name="min_impr" value="${esc(S.min_impr)}"></label><label>أقل مدة للحجز الحصري (أيام)<input type="number" min="1" name="min_days" value="${esc(S.min_days)}"></label>
-   <label class="full">طريقة الدفع التي تظهر للمعلن بعد إرسال الحملة (اسم البنك، الآيبان، اسم المستفيد…)<textarea name="pay_info" rows="3">${esc(S.pay_info)}</textarea></label></div>
+   <label>اسم البائع في الفاتورة<input name="seller_name" value="${esc(S.seller_name)}"></label><label>السجل التجاري / وثيقة العمل الحر<input name="seller_cr" value="${esc(S.seller_cr)}"></label>
+   <label>الرقم الضريبي (إن وُجد)<input name="seller_vat" value="${esc(S.seller_vat)}"></label><label>مهلة سداد الفاتورة (أيام)<input type="number" min="1" name="invoice_days" value="${esc(S.invoice_days)}"></label>
+   <label class="full">عنوان البائع<input name="seller_address" value="${esc(S.seller_address)}"></label>
+   <label class="full">بيانات السداد في الفاتورة (اسم البنك، الآيبان، اسم المستفيد…)<textarea name="pay_info" rows="3">${esc(S.pay_info)}</textarea></label></div>
   <p class="note">✔️ المربع بجانب السعر = الباقة متاحة للبيع في هذه المساحة. ضع ضريبة القيمة المضافة 0 إذا لم تكن مسجّلاً في الضريبة.</p>
   <button type="submit">💾 حفظ الأسعار</button> <span id="pmsg" class="note"></span></form>
 
@@ -110,8 +113,10 @@ async function loadAds() {
   app.querySelectorAll('[data-pv]').forEach((b) => (b.onclick = () => AdForm.preview(b.dataset.pv, slotName[b.dataset.pv])));
   app.querySelectorAll('[data-toggle]').forEach((b) => (b.onclick = async () => { const c = find(b.dataset.toggle); await admApi('adm_ad_status', { id: c.id, status: c.status === 'paused' ? 'active' : 'paused' }).catch((e) => alert(e.message)); loadAds(); }));
   app.querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => { if (!confirm('حذف الحملة وكل إحصاءاتها نهائياً؟')) return; await admApi('adm_ad_del', { id: +b.dataset.del }).catch((e) => alert(e.message)); loadAds(); }));
-  app.querySelectorAll('[data-ok]').forEach((b) => (b.onclick = async () => { const c = find(b.dataset.ok); if (!confirm(`تأكيد استلام ${AdForm.money(c.price, cur)} من «${c.advertiser}» وتفعيل الحملة؟`)) return;
+  app.querySelectorAll('[data-ok]').forEach((b) => (b.onclick = async () => { const c = find(b.dataset.ok); if (!confirm(`قبول إعلان «${c.advertiser}» وإرسال فاتورة بقيمة ${AdForm.money(c.price, cur)}؟`)) return;
     await admApi('adm_ad_decide', { id: c.id, decision: 'approve' }).catch((e) => alert(e.message)); loadAds(); }));
+  app.querySelectorAll('[data-paid]').forEach((b) => (b.onclick = async () => { const c = find(b.dataset.paid); if (!confirm(`تأكيد وصول سداد ${AdForm.money(c.price, cur)} من «${c.advertiser}» (فاتورة ${c.invoice_no}) وتفعيل الحملة؟`)) return;
+    await admApi('adm_ad_decide', { id: c.id, decision: 'paid' }).catch((e) => alert(e.message)); loadAds(); }));
   app.querySelectorAll('[data-no]').forEach((b) => (b.onclick = async () => { const note = prompt('سبب الرفض (يصل للمعلن ليعدّل حملته):', ''); if (note === null) return;
     await admApi('adm_ad_decide', { id: +b.dataset.no, decision: 'reject', note }).catch((e) => alert(e.message)); loadAds(); }));
   app.querySelectorAll('[data-rep]').forEach((b) => (b.onclick = async () => { const u = location.origin + '/ad-report.html?t=' + b.dataset.rep; try { await navigator.clipboard.writeText(u); b.textContent = '✅'; } catch (e) { prompt('رابط تقرير المعلن:', u); } }));
@@ -119,7 +124,7 @@ async function loadAds() {
   app.querySelector('#saveTxt').onclick = async (e) => { try { await admApi('adm_adstxt', { txt: app.querySelector('#adstxt').value }); e.target.textContent = '✅ تم الحفظ'; } catch (er) { alert(er.message); } };
   app.querySelector('#pf').onsubmit = async (e) => { e.preventDefault(); const f = e.target, pricing = {};
     for (const s of j.slots) pricing[s.slot] = { cpm: f[`${s.slot}.cpm`].value, daily: f[`${s.slot}.daily`].value, cpm_on: f[`${s.slot}.cpm_on`].checked, daily_on: f[`${s.slot}.daily_on`].checked };
-    const settings = Object.fromEntries(['currency', 'vat', 'min_impr', 'min_days', 'pay_info'].map((k) => [k, f[k].value]));
+    const settings = Object.fromEntries(['currency', 'vat', 'min_impr', 'min_days', 'pay_info', 'seller_name', 'seller_cr', 'seller_vat', 'seller_address', 'invoice_days'].map((k) => [k, f[k].value]));
     try { await admApi('adm_pricing_save', { pricing, settings }); app.querySelector('#pmsg').textContent = '✅ تم حفظ الأسعار'; } catch (er) { alert(er.message); } };
 }
 function modal(html) {
@@ -133,7 +138,7 @@ function campaignForm(c = {}) {
     <label>اسم الحملة<input name="name" value="${esc(c.name)}" placeholder="مثال: عروض العودة للمدارس"></label>
     ${filler ? '<label>النوع<input value="إعلان رديف (أقل أولوية)" disabled></label>' : `<label>المعلن<input name="advertiser" value="${esc(c.advertiser)}" placeholder="اسم الشركة"></label>`}
     <div class="full"><b>المساحات</b><div id="slotsBox" style="margin-top:6px"></div></div>
-    <fieldset class="full"><legend>استهداف التصنيفات (اتركها فارغة = كل الموقع)</legend>${Object.entries(ADM_CATS).map(([k, v]) => `<label class="ck"><input type="checkbox" name="cats" value="${k}"${cats.includes(k) ? ' checked' : ''}> ${v}</label>`).join('')}</fieldset>
+    <div class="full"><b>الأقسام التي يظهر فيها</b><div id="catsBox" style="margin-top:6px"></div></div>
     <label>نوع الإعلان<select name="kind"><option value="image"${c.kind !== 'html' ? ' selected' : ''}>صور بانر + رابط</option><option value="html"${c.kind === 'html' ? ' selected' : ''}>كود HTML</option></select></label>
     <label>${filler ? 'الوزن بين الإعلانات الرديفة (1-10)' : 'الأولوية (1-10)'}<input name="weight" type="number" min="1" max="10" value="${c.weight || 1}"></label>
     <div class="full k-image" id="crs"></div>
@@ -144,26 +149,27 @@ function campaignForm(c = {}) {
       <label class="ck"><input type="radio" name="pricing" value="cpm"${c.pricing !== 'daily' ? ' checked' : ''}> مرات ظهور (تناوب مع المعلنين)</label>
       <label class="ck"><input type="radio" name="pricing" value="daily"${c.pricing === 'daily' ? ' checked' : ''}> حجز حصري بالأيام</label>
       <div class="frm" style="margin-top:8px"><label class="k-cpm">عدد مرات الظهور لكل مساحة<input type="number" min="0" step="1000" name="max_impr" value="${c.max_impr || 10000}"></label>
-      <label>تاريخ البداية<input type="date" name="start" value="${esc(c.start)}"></label><label>تاريخ النهاية <small class="k-cpm">(اختياري)</small><input type="date" name="end" value="${esc(c.end)}"></label>
+      <label>تاريخ البداية<input type="date" name="start" value="${esc(c.start)}"></label><label class="k-daily">تاريخ النهاية<input type="date" name="end" value="${esc(c.end)}"></label>
       <label>القيمة (${esc(cur)}) <small>فارغ = حسب الأسعار</small><input type="number" step="0.01" min="0" name="price" value="${c.id ? esc(c.price) : ''}"></label></div>
       <div id="qbox" style="margin-top:8px"></div></fieldset>`}
-    <label>الحالة<select name="status">${(filler ? ['active', 'paused'] : c.status === 'pending' ? ['pending', 'active', 'paused'] : ['active', 'paused']).map((s) => `<option value="${s}"${c.status === s ? ' selected' : ''}>${STATUS[s]}</option>`).join('')}</select></label>
+    <label>الحالة<select name="status">${(filler ? ['active', 'paused'] : ['pending', 'awaiting'].includes(c.status) ? [c.status, 'active', 'paused'] : ['active', 'paused']).map((s) => `<option value="${s}"${c.status === s ? ' selected' : ''}>${STATUS[s]}</option>`).join('')}</select></label>
     <div class="full" id="cerr" style="color:#dc2626;font-weight:700"></div>
     <div class="full"><button type="submit">💾 حفظ</button> <button type="button" class="sm" data-close>إلغاء</button></div></form>`);
   const f = d.querySelector('#cf'), err = (m) => (d.querySelector('#cerr').textContent = m || '');
   const getSel = AdForm.slotPicker(d.querySelector('#slotsBox'), ADM_ADS.slots, (c.slots || '').split(','), { showPrice: !filler, currency: cur, onChange: () => { cr.draw(); quote(); } });
   const cr = AdForm.creatives(d.querySelector('#crs'), ADM_ADS.slots, getSel, crOf(c), err);
+  const getCats = AdForm.catsPicker(d.querySelector('#catsBox'), ADM_CATS, cats);
   let qt; const quote = () => { if (filler) return; clearTimeout(qt); qt = setTimeout(async () => { const p = f.pricing.value;
-    d.querySelectorAll('.k-cpm').forEach((x) => (x.hidden = p !== 'cpm'));
-    try { const r = await admApi('adm_quote', { id: c.id || 0, slots: getSel(), pricing: p, start: f.start.value, end: f.end.value, impr: +f.max_impr.value }); d.querySelector('#qbox').innerHTML = AdForm.quoteHTML(r.quote); }
+    d.querySelectorAll('.k-cpm').forEach((x) => (x.hidden = p !== 'cpm')); d.querySelectorAll('.k-daily').forEach((x) => (x.hidden = p !== 'daily'));
+    try { const r = await admApi('adm_quote', { id: c.id || 0, slots: getSel(), pricing: p, start: f.start.value, end: p === 'daily' ? f.end.value : '', impr: +f.max_impr.value }); d.querySelector('#qbox').innerHTML = AdForm.quoteHTML(r.quote); }
     catch (e) { d.querySelector('#qbox').innerHTML = AdForm.quoteHTML(null, e.message); } }, 250); };
   if (!filler) { f.querySelectorAll('[name=pricing],[name=start],[name=end],[name=max_impr]').forEach((x) => x.addEventListener('input', quote)); quote(); }
   const sync = () => { const h = f.kind.value === 'html'; d.querySelectorAll('.k-image').forEach((x) => (x.hidden = h)); d.querySelectorAll('.k-html').forEach((x) => (x.hidden = !h)); };
   f.kind.onchange = sync; sync();
   f.onsubmit = async (e) => { e.preventDefault(); err(); const fd = new FormData(f);
-    const body = { id: c.id || 0, ctype: filler ? 'filler' : 'paid', name: fd.get('name'), advertiser: fd.get('advertiser'), slots: getSel(), cats: fd.getAll('cats'), kind: fd.get('kind'), weight: +fd.get('weight'),
+    const body = { id: c.id || 0, ctype: filler ? 'filler' : 'paid', name: fd.get('name'), advertiser: fd.get('advertiser'), slots: getSel(), cats: getCats() || [], kind: fd.get('kind'), weight: +fd.get('weight'),
       creatives: cr.value(), link: fd.get('link'), alt: fd.get('alt'), html: fd.get('html'), status: fd.get('status'),
-      pricing: fd.get('pricing') || 'cpm', start: fd.get('start') || '', end: fd.get('end') || '', max_impr: +(fd.get('max_impr') || 0), price: fd.get('price') ?? '' };
+      pricing: fd.get('pricing') || 'cpm', start: fd.get('start') || '', end: fd.get('pricing') === 'daily' ? fd.get('end') || '' : '', max_impr: +(fd.get('max_impr') || 0), price: fd.get('price') ?? '' };
     const btn = f.querySelector('[type=submit]'); btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…';
     try { await admApi('adm_ad_save', body); d.remove(); loadAds(); } catch (er) { err(er.message); btn.disabled = false; btn.textContent = '💾 حفظ'; } };
 }

@@ -2,6 +2,7 @@
    - قائمة المساحات تحت بعض، وبجانب كل مساحة زر «مشاهدة موقع الإعلان» يعرض لقطة للموقع على الجوال والتابلت والكمبيوتر
    - خانات رفع الصور لكل مساحة ولكل جهاز مع فحص المقاس */
 const AdForm = (() => {
+  const SCALE = 2; // الصورة المطلوبة بضعف مقاس العرض لتكون حادة على الشاشات عالية الدقة
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const DEV = { m: '📲 جوال', t: '📱 تابلت', d: '💻 كمبيوتر' };
   const money = (v, cur) => `${Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })} ${cur || 'ر.س'}`;
@@ -37,6 +38,15 @@ const AdForm = (() => {
 .af-tpl{font:inherit;font-weight:700;font-size:13px;border:2px solid #5b3cff;background:#fff;color:#5b3cff;border-radius:10px;padding:3px 10px;cursor:pointer}.af-tpl:hover{background:#f5f3ff}
 .af-up{background:#5b3cff;color:#fff;border-radius:10px;padding:5px 12px;font-weight:700;font-size:13px;cursor:pointer;display:inline-block}
 .af-rm{font:inherit;border:0;background:#fee2e2;border-radius:10px;padding:5px 10px;cursor:pointer}
+.af-cats{display:flex;flex-wrap:wrap;gap:6px}.af-cats label.af-chk{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px;padding:6px 12px;border:2px solid #e2e6ff;border-radius:99px;font-weight:600;font-size:14px;cursor:pointer;margin:0}
+.af-cats label.af-chk:has(input:checked){border-color:#5b3cff;background:#f5f3ff}.af-cats .af-all{border-color:#c7d2fe}.af-cats input{accent-color:#5b3cff;width:16px;height:16px;margin:0}
+.af-cal{border:2px solid #e2e6ff;border-radius:16px;padding:12px;background:#fff}.af-cal-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}.af-cal-h button{font:inherit;font-size:22px;border:0;background:#eef1ff;border-radius:10px;width:38px;height:34px;cursor:pointer}
+.af-cal-t{flex:1;text-align:center;font-weight:700;color:#5b3cff}.af-cal-m{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:640px){.af-cal-m{grid-template-columns:1fr}.af-cal-m>div:nth-child(2){display:none}}
+.af-cal-m b{display:block;text-align:center;margin-bottom:6px}.af-cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.af-cal-g i{font-style:normal;text-align:center;color:#94a3b8;font-size:12px;font-weight:700}
+.af-cal-g button{font:inherit;font-size:13px;border:0;border-radius:8px;padding:7px 0;background:#f8fafc;cursor:pointer}.af-cal-g button:hover:not(:disabled){background:#e0e7ff}.af-cal-g button:disabled{color:#cbd5e1;cursor:not-allowed;background:transparent}
+.af-cal-g button.bk{background:#fee2e2;color:#dc2626;text-decoration:line-through}.af-cal-g button.on{background:#ddd6fe}.af-cal-g button.edge{background:#5b3cff;color:#fff;font-weight:700}
+.af-cal-f{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#64748b;margin-top:8px;align-items:center}.af-cal-f .lg{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px}.lg.bk{background:#fee2e2;border:1px solid #dc2626}.lg.on{background:#5b3cff}
+.af-cal-v{margin-inline-start:auto;font-weight:700;color:#1d2350}.af-cal-e{color:#dc2626;font-weight:700;font-size:13px;margin-top:6px}
 .af-q{background:#f5f3ff;border:2px solid #ddd6fe;border-radius:16px;padding:14px}.af-q table{width:100%;border-collapse:collapse;font-size:14px;background:transparent;box-shadow:none}
 .af-q td{padding:5px 4px;border-bottom:1px dashed #ddd6fe}.af-q td:last-child{text-align:end;white-space:nowrap;font-weight:700}
 .af-q .af-tot{font-size:20px;color:#5b3cff}.af-q .af-w{color:#b45309;font-size:13px;margin:6px 0 0}.af-q .af-e{color:#dc2626;font-weight:700}`;
@@ -88,21 +98,23 @@ const AdForm = (() => {
     return { type, w, h, cmyk };
   }
 
-  /* نموذج جاهز بالمقاس الصحيح يحمّله المصمم ويصمم عليه */
+  /* نموذج جاهز بالمقاس الصحيح (بضعف مقاس العرض) يحمّله المصمم ويصمم عليه */
   function template(slotTitle, devName, w, h, fname) {
-    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
-    x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
-    for (let i = 0; i <= Math.max(w, h); i += 10) { x.strokeStyle = i % 50 ? '#f1f4ff' : '#dfe5ff'; x.lineWidth = 1; x.beginPath(); x.moveTo(i + 0.5, 0); x.lineTo(i + 0.5, h); x.moveTo(0, i + 0.5); x.lineTo(w, i + 0.5); x.stroke(); }
-    // المنطقة الآمنة (الحواف تُقص بانحناء 14px)
-    x.setLineDash([6, 4]); x.strokeStyle = '#5b3cff'; x.lineWidth = 2; x.strokeRect(9, 9, w - 18, h - 18); x.setLineDash([]);
-    x.strokeStyle = '#94a3b8'; x.lineWidth = 1; x.beginPath(); x.roundRect ? x.roundRect(0.5, 0.5, w - 1, h - 1, 14) : x.rect(0.5, 0.5, w - 1, h - 1); x.stroke();
+    const k = SCALE, W = w * k, H = h * k;
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
+    for (let i = 0; i <= Math.max(W, H); i += 10 * k) { x.strokeStyle = i % (50 * k) ? '#f1f4ff' : '#dfe5ff'; x.lineWidth = 1; x.beginPath(); x.moveTo(i + 0.5, 0); x.lineTo(i + 0.5, H); x.moveTo(0, i + 0.5); x.lineTo(W, i + 0.5); x.stroke(); }
+    // المنطقة الآمنة (الحواف تُقص بانحناء الزوايا)
+    x.setLineDash([6 * k, 4 * k]); x.strokeStyle = '#5b3cff'; x.lineWidth = 2 * k; x.strokeRect(9 * k, 9 * k, W - 18 * k, H - 18 * k); x.setLineDash([]);
+    x.strokeStyle = '#94a3b8'; x.lineWidth = k; x.beginPath(); x.roundRect ? x.roundRect(k / 2, k / 2, W - k, H - k, 14 * k) : x.rect(k / 2, k / 2, W - k, H - k); x.stroke();
     // مكان شارة «إعلان» (أعلى اليمين) لا تضع فيها نصاً مهماً
-    x.fillStyle = 'rgba(239,68,68,.16)'; x.strokeStyle = '#ef4444'; x.fillRect(w - 52, 4, 48, 20); x.strokeRect(w - 52 + 0.5, 4.5, 47, 19);
-    x.fillStyle = '#b91c1c'; x.font = 'bold 11px Tahoma, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.direction = 'rtl'; x.fillText('إعلان', w - 28, 14.5);
-    // النصوص
-    const f = Math.max(10, Math.min(h * 0.2, w * 0.045, 30)), lines = [[`نموذج إعلان فنتازيا · ${devName}`, '#1d2350', 'bold'], [`${w} × ${h} px`, '#5b3cff', 'bold'], ['RGB · PNG أو JPG · حتى 1.5MB · صمّم داخل الخط المتقطع', '#64748b', '']];
-    const lh = f * 1.25, sizes = [f, f * 1.1, f * 0.62]; let tot = sizes.reduce((s, z) => s + z * 1.25, 0), y = h / 2 - tot / 2;
-    lines.forEach(([t, col, wt], i) => { x.font = `${wt} ${sizes[i]}px Tahoma, sans-serif`; x.fillStyle = col; x.direction = i === 1 ? 'ltr' : 'rtl'; y += sizes[i] * 1.25 / 2; x.fillText(t, w / 2, y, w - 70); y += sizes[i] * 1.25 / 2; });
+    x.fillStyle = 'rgba(239,68,68,.16)'; x.strokeStyle = '#ef4444'; x.lineWidth = k; x.fillRect(W - 52 * k, 4 * k, 48 * k, 20 * k); x.strokeRect(W - 52 * k, 4 * k, 48 * k, 20 * k);
+    x.fillStyle = '#b91c1c'; x.font = `bold ${11 * k}px Tahoma, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.direction = 'rtl'; x.fillText('إعلان', W - 28 * k, 14.5 * k);
+    // النصوص: نموذج إعلان فنتازيا ← موقع الإعلان ← الجهاز ← المقاس ← الشروط
+    const lines = [['نموذج إعلان فنتازيا', '#5b3cff', 'bold', 1], [slotTitle, '#1d2350', 'bold', 1.05], [devName, '#1d2350', '', 0.9], [`${W} × ${H} px`, '#ec4899', 'bold', 1], ['RGB · PNG أو JPG · حتى 1.5MB · صمّم داخل الخط المتقطع', '#64748b', '', 0.62]];
+    const avail = H - 24 * k, tot = lines.reduce((s, l) => s + l[3] * 1.22, 0), f = Math.min(avail / tot, W * 0.045, 30 * k);
+    let y = H / 2 - (tot * f) / 2;
+    lines.forEach(([t, col, wt, sc], i) => { const z = f * sc; x.font = `${wt} ${z}px Tahoma, sans-serif`; x.fillStyle = col; x.direction = i === 3 ? 'ltr' : 'rtl'; y += (z * 1.22) / 2; x.fillText(t, W / 2, y, W - 120 * k); y += (z * 1.22) / 2; });
     c.toBlob((b) => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, 'image/png');
   }
 
@@ -115,7 +127,7 @@ const AdForm = (() => {
       const img = tile.querySelector('img'), info = tile.querySelector('.af-cr-info'), m = msgs[tile.dataset.s + tile.dataset.d];
       if (m) { info.textContent = m; info.className = 'af-cr-info bad'; return; }
       if (!img) { info.textContent = 'لم تُرفع صورة'; info.className = 'af-cr-info'; return; }
-      const go = () => { const rw = img.naturalWidth, rh = img.naturalHeight; if (!rw) return; const ok = Math.abs(rw - w) <= 5 && Math.abs(rh - h) <= 5;
+      const go = () => { const rw = img.naturalWidth, rh = img.naturalHeight; if (!rw) return; const ok = Math.abs(rw - w * SCALE) <= 5 && Math.abs(rh - h * SCALE) <= 5;
         info.textContent = `${rw}×${rh} · ${ok ? '✅ مقاس صحيح' : '⚠️ مقاس مختلف عن المطلوب'}`; info.className = 'af-cr-info ' + (ok ? 'ok' : 'warn'); };
       img.complete ? go() : (img.onload = go);
     };
@@ -123,24 +135,64 @@ const AdForm = (() => {
       const sel = getSel();
       box.innerHTML = sel.length ? '<p class="af-pv-n" style="margin:0 0 8px">حمّل النموذج ⬇️ وصمّم عليه، ثم ارفع الصورة بنفس المقاس بالضبط (يُقبل فرق 5 بكسل فقط) وبألوان RGB. إن لم ترفع صورة التابلت أو الجوال تُستخدم صورة الكمبيوتر وقد تظهر صغيرة.</p>' + sel.map((s) => { const S = slots.find((x) => x.slot === s);
         return `<div class="af-cr-slot"><b>${esc(S.t)}</b> <button type="button" class="af-eye" data-pv="${s}" style="margin-inline-start:6px;padding:3px 10px">👁️</button><div class="af-cr-row">${Object.entries(S.dev).map(([dv, [w, h]]) => { const v = val(s, dv);
-          return `<div class="af-cr-tile" data-s="${s}" data-d="${dv}" data-w="${w}" data-h="${h}"><div class="af-cr-h"><span>${Object.keys(S.dev).length === 1 ? '🖥️📱 كل الأجهزة' : DEV[dv]}</span><span dir="ltr">${w}×${h}</span></div>
+          return `<div class="af-cr-tile" data-s="${s}" data-d="${dv}" data-w="${w}" data-h="${h}"><div class="af-cr-h"><span>${Object.keys(S.dev).length === 1 ? '🖥️📱 كل الأجهزة' : DEV[dv]}</span><span dir="ltr">${w * SCALE}×${h * SCALE}</span></div>
             <div class="af-cr-prev" style="aspect-ratio:${w}/${h}">${v ? `<img src="${esc(v)}" alt="">` : '<span>لم تُرفع صورة</span>'}</div><div class="af-cr-info"></div>
             <div class="af-cr-act"><button type="button" class="af-tpl" data-tpl title="تحميل نموذج فارغ بالمقاس الصحيح للتصميم عليه">⬇️ تحميل النموذج</button><label class="af-up">📁 ${v ? 'تغيير' : 'رفع صورة'}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>${v ? '<button type="button" class="af-rm" data-rm>🗑️</button>' : ''}</div></div>`; }).join('')}</div></div>`; }).join('') : '<p class="af-pv-n">اختر المساحات أولاً لتظهر خانات الصور.</p>';
       box.querySelectorAll('[data-pv]').forEach((b) => (b.onclick = () => preview(b.dataset.pv, slots.find((x) => x.slot === b.dataset.pv).t)));
       box.querySelectorAll('.af-cr-tile').forEach((t) => { const { s, d: dv, w, h } = t.dataset, key = s + dv, S = slots.find((x) => x.slot === s); check(t, +w, +h);
-        t.querySelector('[data-tpl]').onclick = () => template(S.t, Object.keys(S.dev).length === 1 ? 'كل الأجهزة' : DEV[dv].replace(/^\S+\s/, ''), +w, +h, `fntazya-${s}-${dv}-${w}x${h}.png`);
+        t.querySelector('[data-tpl]').onclick = () => template(S.t, Object.keys(S.dev).length === 1 ? 'كل الأجهزة' : DEV[dv].replace(/^\S+\s/, ''), +w, +h, `fntazya-${s}-${dv}-${w * SCALE}x${h * SCALE}.png`);
         t.querySelector('input[type=file]').onchange = async (e) => { const fl = e.target.files[0]; e.target.value = ''; if (!fl) return;
           const bad = (m) => { msgs[key] = '⛔ ' + m; onErr?.(`${S.t} (${DEV[dv] || ''}): ${m}`); draw(); };
           if (fl.size > 1500000) return bad('حجم الملف أكبر من 1.5 ميغا');
           const r = await inspect(fl); if (r.err) return bad(r.err);
           if (r.cmyk) return bad('الصورة بألوان CMYK (للطباعة). احفظها بألوان RGB');
-          if (Math.abs(r.w - +w) > 5 || Math.abs(r.h - +h) > 5) return bad(`المقاس ${r.w}×${r.h} غير صحيح، المطلوب ${w}×${h} بكسل. حمّل النموذج وصمّم عليه`);
+          if (Math.abs(r.w - w * SCALE) > 5 || Math.abs(r.h - h * SCALE) > 5) return bad(`المقاس ${r.w}×${r.h} غير صحيح، المطلوب ${w * SCALE}×${h * SCALE} بكسل. حمّل النموذج وصمّم عليه`);
           delete msgs[key]; onErr?.('');
           const fr = new FileReader(); fr.onload = () => { (pend[s] ||= {})[dv] = fr.result; draw(); }; fr.readAsDataURL(fl); };
         t.querySelector('[data-rm]')?.addEventListener('click', () => { (pend[s] ||= {})[dv] = ''; delete msgs[key]; draw(); }); });
     };
     draw();
     return { draw, value: () => { const o = {}; for (const s of getSel()) { const S = slots.find((x) => x.slot === s); o[s] = {}; for (const dv of Object.keys(S.dev)) o[s][dv] = val(s, dv); } return o; } };
+  }
+
+  /* استهداف الأقسام: أول خيار «الكل» */
+  function catsPicker(box, cats, selected) {
+    css();
+    const sel = (selected || []).filter(Boolean), all = !sel.length;
+    box.innerHTML = `<div class="af-cats"><label class="af-chk af-all"><input type="checkbox" data-all${all ? ' checked' : ''}> <b>الكل</b></label>${Object.entries(cats).map(([k, v]) => `<label class="af-chk"><input type="checkbox" name="cats" value="${k}"${all || sel.includes(k) ? ' checked' : ''}> ${esc(v)}</label>`).join('')}</div>`;
+    const allB = box.querySelector('[data-all]'), items = [...box.querySelectorAll('input[name=cats]')];
+    allB.onchange = () => items.forEach((i) => (i.checked = allB.checked));
+    items.forEach((i) => (i.onchange = () => (allB.checked = items.every((x) => x.checked))));
+    return () => { const c = items.filter((i) => i.checked).map((i) => i.value); return c.length === items.length ? [] : c.length ? c : null; }; // [] = كل الموقع، null = لا شيء
+  }
+
+  /* تقويم الحجز: الأيام المحجوزة حصرياً تظهر ممنوعة ولا يمكن اختيارها */
+  const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  const iso = (d) => d.toISOString().slice(0, 10), addD = (s, n) => iso(new Date(Date.parse(s + 'T00:00:00Z') + n * 864e5));
+  function calendar(box, o) {
+    css();
+    const st = { mode: o.mode || 'range', min: o.min, booked: o.booked || [], start: o.start || '', end: o.end || '', view: (o.start || o.min).slice(0, 7), msg: '' };
+    const isBooked = (d) => st.booked.some(([a, b]) => d >= a && d <= b);
+    const draw = () => {
+      const [Y, M] = st.view.split('-').map(Number), months = [0, 1].map((i) => new Date(Date.UTC(Y, M - 1 + i, 1)));
+      box.innerHTML = `<div class="af-cal"><div class="af-cal-h"><button type="button" data-nav="-1" aria-label="الشهر السابق">›</button><span class="af-cal-t">${st.mode === 'range' ? (st.start && !st.end ? 'اختر يوم النهاية' : 'اختر يوم البداية ثم يوم النهاية') : 'اختر يوم بداية الحملة'}</span><button type="button" data-nav="1" aria-label="الشهر التالي">‹</button></div>
+        <div class="af-cal-m">${months.map((m) => { const y = m.getUTCFullYear(), mo = m.getUTCMonth(), first = new Date(Date.UTC(y, mo, 1)).getUTCDay(), n = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+          let cells = ''; for (let i = 0; i < first; i++) cells += '<span></span>';
+          for (let d = 1; d <= n; d++) { const ds = iso(new Date(Date.UTC(y, mo, d))), past = ds < st.min, bk = isBooked(ds);
+            const inR = st.start && (ds === st.start || (st.end && ds >= st.start && ds <= st.end));
+            cells += `<button type="button" data-d="${ds}" class="${bk ? 'bk' : ''}${inR ? ' on' : ''}${ds === st.start || ds === st.end ? ' edge' : ''}"${past || bk ? ' disabled' : ''} title="${bk ? 'محجوز حصرياً لمعلن آخر' : ''}">${d}</button>`; }
+          return `<div><b>${MONTHS[mo]} ${y}</b><div class="af-cal-g"><i>ح</i><i>ن</i><i>ث</i><i>ر</i><i>خ</i><i>ج</i><i>س</i>${cells}</div></div>`; }).join('')}</div>
+        <div class="af-cal-f"><span><i class="lg bk"></i> محجوز حصرياً</span><span><i class="lg on"></i> اختيارك</span><span class="af-cal-v">${st.start ? (st.mode === 'range' ? `من ${st.start}${st.end ? ` إلى ${st.end}` : ''}` : `البداية: ${st.start}`) : ''}</span></div>${st.msg ? `<div class="af-cal-e">${esc(st.msg)}</div>` : ''}</div>`;
+      box.querySelectorAll('[data-nav]').forEach((b) => (b.onclick = () => { const d = new Date(Date.UTC(Y, M - 1 + +b.dataset.nav, 1)); st.view = iso(d).slice(0, 7); st.msg = ''; draw(); }));
+      box.querySelectorAll('[data-d]').forEach((b) => (b.onclick = () => { const d = b.dataset.d; st.msg = '';
+        if (st.mode === 'single') { st.start = d; st.end = ''; }
+        else if (!st.start || st.end || d < st.start) { st.start = d; st.end = ''; }
+        else { let x = st.start, clash = false; while (x <= d) { if (isBooked(x)) { clash = true; break; } x = addD(x, 1); }
+          if (clash) { st.msg = 'الفترة تتقاطع مع أيام محجوزة حصرياً. اختر فترة بلا أيام حمراء'; st.start = d; st.end = ''; } else st.end = d; }
+        draw(); o.onChange?.({ start: st.start, end: st.end }); }));
+    };
+    draw();
+    return { get: () => ({ start: st.start, end: st.end }), set: (p) => { Object.assign(st, p); if (st.start && isBooked(st.start)) { st.start = ''; st.end = ''; } if (st.mode === 'single') st.end = ''; draw(); } };
   }
 
   /* عرض عرض السعر */
@@ -150,9 +202,9 @@ const AdForm = (() => {
     return `<div class="af-q"><b>💰 قيمة الحملة</b><table>${q.lines.map((l) => `<tr><td>${esc(l.t)}<br><small style="color:#64748b">${esc(l.desc)}</small></td><td>${money(l.cost, q.currency)}</td></tr>`).join('')}
       ${q.vatRate ? `<tr><td>ضريبة القيمة المضافة ${q.vatRate}%</td><td>${money(q.vat, q.currency)}</td></tr>` : ''}
       <tr><td><b>الإجمالي</b></td><td class="af-tot">${money(q.total, q.currency)}</td></tr></table>
-      ${q.pricing === 'cpm' ? `<p class="af-pv-n" style="margin-top:6px">يُحسب الظهور فقط عندما يظهر نصف الإعلان على الشاشة لمدة ثانية. ${q.lines.some((l) => l.estDays) ? 'المدة المتوقعة حسب الزيارات الحالية: ' + q.lines.filter((l) => l.estDays).map((l) => `${esc(l.t.split(':')[0])} ${l.estDays} يوماً`).join('، ') : ''}</p>` : `<p class="af-pv-n" style="margin-top:6px">حجز حصري: إعلانك وحده في هذه المساحة طوال ${q.days} يوم.</p>`}
+      ${q.pricing === 'cpm' ? `<p class="af-pv-n" style="margin-top:6px">يُحسب الظهور فقط عندما يظهر نص الإعلان على الشاشة لمدة ثانية. ${q.lines.some((l) => l.estDays) ? 'المدة المتوقعة حسب الزيارات الحالية: ' + q.lines.filter((l) => l.estDays).map((l) => `${esc(l.t.split(':')[0])} ${l.estDays} يوماً`).join('، ') : ''}</p>` : `<p class="af-pv-n" style="margin-top:6px">حجز حصري: إعلانك وحده في هذه المساحة طوال ${q.days} يوم.</p>`}
       ${(q.warnings || []).map((w) => `<p class="af-w">⚠️ ${esc(w)}</p>`).join('')}</div>`;
   }
 
-  return { preview, slotPicker, creatives, quoteHTML, money, fmt, esc, inspect, template };
+  return { preview, slotPicker, creatives, quoteHTML, money, fmt, esc, inspect, template, catsPicker, calendar };
 })();

@@ -99,7 +99,7 @@ function openDashboard(){const u=ACC.user||{};let stars=0,stages=0,trophies=0;co
     ${cats.length?`<h3>💪 نقاط قوتك</h3><div class="acc-bars">${cats.map(([k,v])=>`<div><span>${CATS[k]?.e||''} ${esc(CATS[k]?.t||k)}</span><i style="--w:${Math.round(v/tot*100)}%;--c1:${CATS[k]?.c[0]||'#6366f1'};--c2:${CATS[k]?.c[1]||'#a5b4fc'}"></i></div>`).join('')}</div>`:''}
     ${recs.length?`<h3>✨ مقترحة لك${tc?` لأنك تحب ${esc(tc.t)}`:''}</h3><div class="acc-row">${recs.map(mini).join('')}</div>`:''}
     <label class="acc-mk"><input type="checkbox" data-mk${u.marketing?' checked':''}> 📬 استلام جديد الألعاب على بريد ولي الأمر</label>
-    <div class="acc-btns small">${u.admin?'<a class="play-btn" href="admin.html">📊 لوحة الإدارة</a>':''}<button class="play-btn alt" data-pin>🔑 تغيير الرمز</button><button class="play-btn alt" data-out>🚪 خروج</button></div>
+    <div class="acc-btns small">${u.admin?'<a class="play-btn" href="admin.html">📊 لوحة الإدارة</a>':''}${u.advertiser?'<a class="play-btn" href="advertiser.html">📢 بوابة المعلنين</a>':''}<button class="play-btn alt" data-pin>🔑 تغيير الرمز</button><button class="play-btn alt" data-out>🚪 خروج</button></div>
     <button class="acc-link danger" data-del>حذف الحساب وبياناته</button>`);
   ov.querySelectorAll('.acc-g').forEach(a=>a.addEventListener('click',()=>ov.remove()));
   ov.querySelector('[data-out]').onclick=async()=>{await accFlush();try{await accCall('logout',{},true)}catch{}ACC.token='';ACC.user=null;ov.remove();renderAccBtn();toast('سجّلت الخروج. تقدّمك محفوظ في حسابك 👋')};
