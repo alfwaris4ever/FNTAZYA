@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS ad_settings(k TEXT PRIMARY KEY, v TEXT);
 CREATE TABLE IF NOT EXISTS advertisers(id INTEGER PRIMARY KEY, email TEXT UNIQUE, pass_hash TEXT, company TEXT, name TEXT, phone TEXT, created INTEGER, last_seen INTEGER, suspended INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS adv_tokens(token_hash TEXT PRIMARY KEY, adv_id INTEGER, created INTEGER);
 CREATE TABLE IF NOT EXISTS ad_devstats(cid INTEGER, slot TEXT, dev TEXT, impr INTEGER DEFAULT 0, clicks INTEGER DEFAULT 0, PRIMARY KEY(cid,slot,dev));
+CREATE TABLE IF NOT EXISTS ad_deleted(id INTEGER PRIMARY KEY, cid INTEGER, data TEXT, refund REAL, ts INTEGER);
 CREATE TABLE IF NOT EXISTS adv_resets(token_hash TEXT PRIMARY KEY, adv_id INTEGER, created INTEGER);
 SQL);
   $cols = array_column(db()->query('PRAGMA table_info(ad_campaigns)')->fetchAll(), 'name');
@@ -641,12 +642,25 @@ switch ($a) {
     out(['ok' => true, 'refund' => $refund]);
   }
 
-  case 'adm_ad_del': {
-    requireAdmin(); $id = (int)($b['id'] ?? 0);
-    $st = db()->prepare('SELECT ctype FROM ad_campaigns WHERE id=?'); $st->execute([$id]);
-    if ($st->fetchColumn() === 'filler') fail('الإعلانات الرديفة لا تُحذف، يمكنك تعديلها فقط');
-    db()->prepare('DELETE FROM ad_stats WHERE cid=?')->execute([$id]); db()->prepare('DELETE FROM ad_campaigns WHERE id=?')->execute([$id]);
-    out(['ok' => true]);
+  case 'adm_ad_del': { // حذف، وللحملة المدفوعة الجارية: حذف وإرجاع المبلغ المتبقي
+    requireAdmin(); $S = adSettings(); $id = (int)($b['id'] ?? 0);
+    $st = db()->prepare('SELECT c.*, a.email adv_email, a.name adv_name FROM ad_campaigns c LEFT JOIN advertisers a ON a.id=c.adv_id WHERE c.id=?'); $st->execute([$id]); $c = $st->fetch();
+    if (!$c) fail('الحملة غير موجودة', 404);
+    if ($c['ctype'] === 'filler') fail('الإعلانات الرديفة لا تُحذف، يمكنك تعديلها فقط');
+    $refund = null;
+    if (in_array($c['status'], ['active', 'paused'], true)) {
+      $bal = balanceOf($c); $refund = isset($b['refund']) && $b['refund'] !== '' ? max(0, min((float)$c['price'], (float)$b['refund'])) : $bal['remaining'];
+      $note = mb_substr(trim(strip_tags((string)($b['note'] ?? ''))), 0, 500);
+      if (!empty($c['adv_email'])) try { sendMail($c['adv_email'], 'إلغاء حملتك الإعلانية وإرجاع المبلغ - فنتازيا', 'تم إلغاء حملتك وإرجاع المبلغ',
+        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($c['adv_name']) . '،<br>تم إلغاء حملة <b>' . h($c['name']) . '</b>.' . ($note ? '<br>' . nl2br(h($note)) : '') . '</p>'
+        . '<table role="presentation" cellpadding="6" style="font-size:14px;background:#f8fafc;border-radius:12px;width:100%"><tr><td>قيمة الحملة</td><td>' . money($c['price'], $S) . '</td></tr><tr><td>المستهلك</td><td>' . money($bal['consumed'], $S) . '</td></tr><tr><td><b>المبلغ المسترد</b></td><td><b>' . money($refund, $S) . '</b></td></tr></table>'
+        . '<p style="font-size:14px">سيصلك المبلغ المسترد على حسابك البنكي، وتواصل معنا إن احتجت أي تفاصيل.</p>', "تم إلغاء حملتك {$c['name']}. المبلغ المسترد: " . money($refund, $S)); } catch (Throwable $e) { error_log('del mail: ' . $e->getMessage()); }
+    }
+    // نحفظ نسخة من الحملة المحذوفة للسجل المالي
+    $c['bal'] = balanceOf($c); $c['deleted_refund'] = $refund ?? (float)$c['refund'];
+    db()->prepare('INSERT INTO ad_deleted(cid,data,refund,ts) VALUES(?,?,?,?)')->execute([$id, json_encode($c, JSON_UNESCAPED_UNICODE), $c['deleted_refund'], time()]);
+    db()->prepare('DELETE FROM ad_stats WHERE cid=?')->execute([$id]); db()->prepare('DELETE FROM ad_devstats WHERE cid=?')->execute([$id]); db()->prepare('DELETE FROM ad_campaigns WHERE id=?')->execute([$id]);
+    out($refund !== null ? ['ok' => true, 'refund' => $refund] : ['ok' => true]);
   }
 
   case 'adm_pricing_save': {
