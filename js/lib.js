@@ -1,22 +1,87 @@
 /* فنتازيا: دوال وبيانات مشتركة تستخدمها أكثر من لعبة. تعديل أي شيء هنا يؤثر على عدة ألعاب. */
 /* أسئلة: عدد الأسئلة يزيد من 5 إلى 10، والمؤقت يبدأ من الدرجة 9 ويقصر تدريجياً */
-/* secs (اختياري): وقت ثابت لكل سؤال بالثواني يظهر كشريط في الأسفل. بدونه يبدأ الوقت من الدرجة 9 ويقصر تدريجياً */
+/* ---------- أسئلة الاختيار على شكل سباق سيارات: السؤال فوق، وكل إجابة لوحة فوق مسار، واللاعب يوجّه السيارة لمسار الإجابة قبل وصول اللوحات ---------- */
+/* secs (اختياري): وقت كل سؤال بالثواني. بدونه: سهل 6، وسط 5، صعب 4.5 ثانية */
+const DRV_ENVS=[
+  {n:'صحراء',sky:['#7dd3fc','#fde68a'],g:['#f6d68b','#e7b95a'],road:'#6b5b4b',curb:['#fff','#f97316'],items:['🌴','🌵','🐪','🌴','🌵','🏜️']},
+  {n:'مدينة',sky:['#60a5fa','#dbeafe'],g:['#cbd5e1','#94a3b8'],road:'#475569',curb:['#fff','#3b82f6'],items:['🏢','🏬','🏫','🏠','🚦','🌳']},
+  {n:'غابة',sky:['#86efac','#ecfccb'],g:['#4ade80','#16a34a'],road:'#57534e',curb:['#fff','#16a34a'],items:['🌳','🌲','🍄','🦌','🌲','🐿️']},
+  {n:'شاطئ',sky:['#38bdf8','#e0f2fe'],g:['#fde68a','#facc15'],road:'#64748b',curb:['#fff','#06b6d4'],items:['🌴','⛱️','🦀','🐚','🌴','🏖️'],sea:'#0ea5e9'},
+  {n:'ثلج',sky:['#bae6fd','#f0f9ff'],g:['#f8fafc','#cbd5e1'],road:'#64748b',curb:['#fff','#60a5fa'],items:['⛄','🌲','❄️','🏔️','🌲','🦌']},
+  {n:'مزرعة',sky:['#7dd3fc','#ecfeff'],g:['#bef264','#65a30d'],road:'#78716c',curb:['#fff','#eab308'],items:['🌻','🐄','🚜','🐑','🏡','🌾']},
+  {n:'أرض الحلوى',sky:['#f9a8d4','#fdf2f8'],g:['#fbcfe8','#f472b6'],road:'#a78bfa',curb:['#fff','#ec4899'],items:['🍭','🍬','🧁','🍩','🍦','🍫']},
+  {n:'خريف',sky:['#fdba74','#fef3c7'],g:['#fdba74','#ea580c'],road:'#6b7280',curb:['#fff','#dc2626'],items:['🍁','🍂','🌳','🏔️','🍁','🎃']},
+];
+const DRV_CARS=['#ef4444','#3b82f6','#facc15','#22c55e','#f97316','#a855f7','#ec4899','#f8fafc'];
 function quiz(root,c,{make,secs}){
-  const total=c.fi(5,10),tl=secs!=null?secs:(c.lv<8?0:Math.round(c.f(22,6)));let q=0,score=0,left=0,lock=true;
-  root.innerHTML=`<div class="hud">${c.tag}<span class="pill">❓ <b class="qn">0</b> من ${total}</span><span class="pill">⭐ <b class="sc">0</b></span></div><div class="body"${tl?' style="bottom:36px"':''}><div class="quiz"><div class="q"></div><div class="choices"></div></div></div>${tl?'<div class="tbar" role="progressbar" aria-label="الوقت المتبقي"><i></i></div>':''}`;
-  const $q=root.querySelector('.q'),$ch=root.querySelector('.choices'),bar=root.querySelector('.tbar'),fill=bar?.firstElementChild;
-  const paint=()=>{const p=Math.max(0,left/(tl*1000));fill.style.width=(p*100)+'%';bar.classList.toggle('low',p<=.3)};
-  let endAt=0;c.resumeFns.push(dt=>{endAt+=dt});if(tl)c.every(()=>{if(lock)return;left=endAt-performance.now();paint();if(left<=0)answer(null,false)},100);
-  let cur;
-  function answer(btn,ok){lock=true;
-    if(ok){btn.classList.add('ok');score++;root.querySelector('.sc').textContent=score;sfx.good();cur.onOk?.()}
-    else{btn?.classList.add('bad');sfx.bad();$ch.querySelector('[data-ok]').classList.add('ok')}
-    cur.onAnswer?.($ch.querySelector('[data-ok]'));c.after(next,cur.delay||1100)}
-  function next(){if(q>=total)return c.win(score*10,score===total?'كل إجاباتك صحيحة! 🌟':(total-score===1?'أخطأت في سؤال واحد':total-score===2?'أخطأت في سؤالين':`أخطأت في ${total-score} أسئلة`),{got:score,total,perfect:score===total,label:'إجابات صحيحة'});
-    q++;root.querySelector('.qn').textContent=q;cur=make();$q.innerHTML=cur.q;$ch.innerHTML='';$ch.className='choices n'+cur.choices.length;
-    shuffle(cur.choices).forEach(ch=>{const b=h(`<button class="choice"${ch.ok?' data-ok':''}>${ch.html}</button>`);b.onclick=()=>{if(!lock)answer(b,ch.ok)};$ch.append(b)});
-    left=tl*1000;endAt=performance.now()+left;if(tl)paint();lock=false;cur.onShow?.()}
-  next();
+  const total=c.fi(5,10),driveT=secs!=null?secs:[6,5,4.5][c.run.diff],ENV=DRV_ENVS[rnd(0,DRV_ENVS.length-1)],CAR=DRV_CARS[rnd(0,DRV_CARS.length-1)];
+  let q=0,score=0,lock=true,cur=null,n=3,lane=1,carX=null,g=0,signs=[],dead=false,phase=0,t0=performance.now(),res=null,shake=0;
+  root.innerHTML=`<style>
+    .drv-cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .drv-q{position:absolute;top:calc(var(--hud,58px) + 2px);left:50%;translate:-50% 0;z-index:4;background:#fff;color:#1d2350;border-radius:22px;padding:6px 18px 8px;text-align:center;box-shadow:0 6px 0 rgba(29,35,80,.18);max-width:92%;min-width:min(260px,80%);font:800 clamp(24px,7cqmin,46px) system-ui,Tahoma,sans-serif;line-height:1.2}
+    .drv-q .big-pic,.drv-q .big-letter{font-size:clamp(40px,11cqmin,84px);line-height:1.05;color:#5b3cff}.drv-q .q-hint{font-size:clamp(14px,3.6cqmin,21px);color:#555b85;margin-top:2px}
+    .drv-q .blob{width:clamp(46px,12cqmin,86px);height:clamp(46px,12cqmin,86px);margin:2px auto}.drv-q .stroop{font-size:clamp(34px,9cqmin,64px)}.drv-q .q-word{font-size:clamp(16px,4cqmin,24px)}
+    #stage .drv-q,#stage .drv-q *{color:#1d2350!important;text-shadow:none!important;opacity:1!important}#stage .drv-q .big-letter,#stage .drv-q .big-pic{color:#5b3cff!important}#stage .drv-q .q-hint{color:#555b85!important}
+    #stage .hud .pill{background:rgba(29,35,80,.78)!important;color:#fff!important}#stage .hud .pill b{color:#facc15!important}
+    .drv-signs{position:absolute;inset:0;z-index:3;pointer-events:none}
+    .drv-sign{position:absolute;translate:-50% -100%;pointer-events:auto;cursor:pointer;background:linear-gradient(#22c55e,#15803d);color:#fff;border:3px solid #fff;border-radius:14px;box-shadow:0 4px 0 rgba(0,0,0,.25);display:grid;place-items:center;text-align:center;font-weight:900;line-height:1.1;padding:.25em .2em;overflow:hidden;text-shadow:0 2px 0 rgba(0,0,0,.25)}
+    .drv-sign::after{content:"⬇";display:block;font-size:.55em;opacity:.9}
+    .drv-sign .pic{font-size:1.5em;line-height:1}.drv-sign .cap{display:none;font-size:.55em}.drv-sign.show-cap .cap{display:block}.drv-sign .ltr-choice{font-size:1.3em}
+    .drv-sign.mine{outline:4px solid #facc15;outline-offset:2px}
+    .drv-sign.ok{background:linear-gradient(#4ade80,#16a34a);outline:5px solid #fff;animation:pop .35s}.drv-sign.bad{background:linear-gradient(#f87171,#b91c1c);animation:shake .4s}
+  </style><canvas class="drv-cv"></canvas><div class="drv-signs"></div><div class="hud">${c.tag}<span class="pill">❓ <b class="qn">0</b> من ${total}</span><span class="pill">⭐ <b class="sc">0</b></span></div><div class="drv-q"></div><div class="tbar" role="progressbar" aria-label="الوقت المتبقي"><i></i></div>`;
+  const cv=root.querySelector('.drv-cv'),x=cv.getContext('2d'),$q=root.querySelector('.drv-q'),$s=root.querySelector('.drv-signs'),bar=root.querySelector('.tbar'),fill=bar.firstElementChild;
+  let W=0,H=0,dpr=1;const size=()=>{const r=root.getBoundingClientRect();W=r.width;H=r.height;dpr=Math.min(2,devicePixelRatio||1);cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr)};size();c.on(window,'resize',size);
+  /* هندسة المنظور: z=0 عند الأفق، z=1 عند السيارة */
+  const geo=()=>{const qb=$q.getBoundingClientRect(),rr=root.getBoundingClientRect(),hy=Math.max(H*.34,qb.bottom-rr.top+H*.2),yc=H-46-Math.min(70,H*.09),hw=Math.min(W*.47,(yc-hy)*1.25);return{hy,yc,hw,top:hw*.1}};
+  const Y=(G,z)=>G.hy+(G.yc-G.hy)*z,HW=(G,z)=>G.top+(G.hw-G.top)*z,LX=(G,z,i)=>W/2-HW(G,z)+HW(G,z)*2*(i+.5)/n;
+  const scen=[];for(let k=0;k<14;k++)scen.push({z:Math.random(),s:k%2?1:-1,e:ENV.items[rnd(0,ENV.items.length-1)],o:.15+Math.random()*.9});
+  function setLane(i){if(lock&&g>=1)return;lane=Math.max(0,Math.min(n-1,i));signs.forEach((s,k)=>s.el.classList.toggle('mine',k===lane));beep(620,.04,'triangle',.06)}
+  c.on(window,'keydown',e=>{if(c.paused)return;if(e.key==='ArrowLeft'||e.key==='a'){e.preventDefault();setLane(lane-1)}else if(e.key==='ArrowRight'||e.key==='d'){e.preventDefault();setLane(lane+1)}
+    else{const d=parseInt(e.key,10);if(d>=1&&d<=n){e.preventDefault();setLane(d-1)}}});
+  let sx=null;c.on(cv,'pointerdown',e=>{sx=e.clientX});c.on(cv,'pointerup',e=>{if(sx==null)return;const dx=e.clientX-sx,r=cv.getBoundingClientRect();sx=null;
+    if(Math.abs(dx)>25)setLane(lane+(dx>0?1:-1));else setLane(lane+(e.clientX-r.left<carX?-1:1))});
+  function answer(i){lock=true;const s=signs[i],ok=!!s?.ok,okS=signs.find(z=>z.ok);
+    if(ok){s.el.classList.add('ok');score++;root.querySelector('.sc').textContent=score;sfx.good();cur.onOk?.();res={t:'+1',col:'#16a34a',a:performance.now()}}
+    else{s?.el.classList.add('bad');okS?.el.classList.add('ok');sfx.bad();shake=.5;res={t:'✗',col:'#dc2626',a:performance.now()}}
+    cur.onAnswer?.(okS?.el);c.after(next,cur.delay||1300)}
+  function next(){if(q>=total){dead=true;return c.win(score*10,score===total?'كل إجاباتك صحيحة! 🌟':(total-score===1?'أخطأت في سؤال واحد':total-score===2?'أخطأت في سؤالين':`أخطأت في ${total-score} أسئلة`),{got:score,total,perfect:score===total,label:'إجابات صحيحة'})}
+    q++;root.querySelector('.qn').textContent=q;cur=make();$q.innerHTML=cur.q;const ch=shuffle(cur.choices);n=ch.length;$s.innerHTML='';
+    signs=ch.map((o,k)=>{const el=h(`<div class="drv-sign"${o.ok?' data-ok':''}>${o.html}</div>`);el.onpointerdown=e=>{e.stopPropagation();setLane(k)};$s.append(el);return{el,ok:o.ok}});
+    lane=Math.floor((n-1)/2);setLane(lane);g=0;res=null;lock=false;cur.onShow?.()}
+  function car(X,yc,s,t){x.save();x.translate(X+(shake>0?Math.sin(t*60)*6*shake:0),yc+Math.sin(t*14)*1.5);x.scale(s,s);
+    x.fillStyle='rgba(0,0,0,.25)';x.beginPath();x.ellipse(0,34,58,10,0,0,7);x.fill();
+    x.fillStyle='#1f2937';[[-44,14],[30,14]].forEach(([a,b])=>{x.beginPath();x.roundRect(a,b,14,24,5);x.fill()});
+    x.fillStyle=CAR;x.strokeStyle='rgba(0,0,0,.25)';x.lineWidth=3;x.beginPath();x.roundRect(-50,-6,100,40,16);x.fill();x.stroke();
+    x.beginPath();x.roundRect(-36,-36,72,36,[18,18,6,6]);x.fill();x.stroke();
+    x.fillStyle='#bfe3ff';x.beginPath();x.roundRect(-28,-30,56,24,[12,12,4,4]);x.fill();x.fillStyle='rgba(255,255,255,.6)';x.fillRect(-22,-26,10,16);
+    x.fillStyle='#fde047';x.beginPath();x.arc(-36,12,7,0,7);x.arc(36,12,7,0,7);x.fill();x.fillStyle='#fff';x.beginPath();x.roundRect(-14,6,28,12,4);x.fill();
+    x.fillStyle='#1d2350';x.font='800 9px system-ui';x.textAlign='center';x.fillText('فنتازيا',0,15);x.restore()}
+  (function loop(){if(dead||!cv.isConnected)return;requestAnimationFrame(loop);if(c.paused)return;const now=performance.now(),dt=Math.min(.05,(now-(loop.l||now))/1000);loop.l=now;const t=(now-t0)/1000;
+    if(!lock&&cur){g=Math.min(1,g+dt/driveT);if(g>=1)answer(lane)}else if(lock&&cur&&g<1.25)g+=dt/driveT*1.2;
+    const p=Math.max(0,1-Math.min(1,g));fill.style.width=(p*100)+'%';bar.classList.toggle('low',p<=.3&&!lock);shake=Math.max(0,shake-dt);phase=(phase+dt*1.6)%1;
+    const G=geo();x.setTransform(dpr,0,0,dpr,0,0);
+    const sk=x.createLinearGradient(0,0,0,G.hy);sk.addColorStop(0,ENV.sky[0]);sk.addColorStop(1,ENV.sky[1]);x.fillStyle=sk;x.fillRect(0,0,W,G.hy+2);
+    x.font=`${Math.round(H*.07)}px serif`;x.textAlign='center';x.textBaseline='middle';x.fillText('☀️',W*.86,G.hy*.45);x.globalAlpha=.9;x.fillText('☁️',(W*.2+t*12)%(W+80)-40,G.hy*.55);x.fillText('☁️',(W*.65+t*8)%(W+80)-40,G.hy*.35);x.globalAlpha=1;
+    const gr=x.createLinearGradient(0,G.hy,0,H);gr.addColorStop(0,ENV.g[0]);gr.addColorStop(1,ENV.g[1]);x.fillStyle=gr;x.fillRect(0,G.hy,W,H-G.hy);
+    if(ENV.sea){x.fillStyle=ENV.sea;x.beginPath();x.moveTo(W/2+G.top+30,G.hy);x.lineTo(W,G.hy);x.lineTo(W,G.hy+(H-G.hy)*.35);x.fill()}
+    const STR=12;for(let k=0;k<STR;k++){const z0=k/STR,z1=(k+1)/STR,zz=(z0+phase/STR),a=Y(G,z0),b=Y(G,z1),w0=HW(G,z0),w1=HW(G,z1);
+      x.fillStyle=ENV.road;x.beginPath();x.moveTo(W/2-w0,a);x.lineTo(W/2+w0,a);x.lineTo(W/2+w1,b);x.lineTo(W/2-w1,b);x.fill();
+      const cc=ENV.curb[(k+Math.floor(phase*2))%2];x.fillStyle=cc;for(const sd of[-1,1]){x.beginPath();x.moveTo(W/2+sd*w0,a);x.lineTo(W/2+sd*w0*1.06,a);x.lineTo(W/2+sd*w1*1.06,b);x.lineTo(W/2+sd*w1,b);x.fill()}}
+    x.strokeStyle='rgba(255,255,255,.85)';for(let i=1;i<n;i++){for(let k=0;k<10;k++){const za=((k+phase)/10)**1.6,zb=Math.min(1,((k+phase+.45)/10)**1.6),xa=W/2-HW(G,za)+HW(G,za)*2*i/n,xb=W/2-HW(G,zb)+HW(G,zb)*2*i/n;x.lineWidth=2+6*za;x.beginPath();x.moveTo(xa,Y(G,za));x.lineTo(xb,Y(G,zb));x.stroke()}}
+    scen.forEach(o=>{o.z+=dt*.25*(.25+o.z*1.6);if(o.z>1.15){o.z=0;o.e=ENV.items[rnd(0,ENV.items.length-1)];o.o=.15+Math.random()*.9}});
+    [...scen].sort((a,b)=>a.z-b.z).forEach(o=>{const z=Math.min(1.15,o.z),sz=12+H*.16*z*z+6;x.font=`${sz}px serif`;x.fillText(o.e,W/2+o.s*(HW(G,z)*(1.12+o.o)+sz*.4),Y(G,Math.min(z,1.1))-sz*.35)});
+    /* البوّابة واللوحات */
+    const zg=.3+.7*Math.min(1.25,g)**1.5,gy=Y(G,Math.min(zg,1.05)),sc=HW(G,Math.min(zg,1))/G.hw,vis=zg<1.15;
+    if(cur&&vis){const pw=Math.max(3,10*sc),ph=Math.max(30,H*.32*sc);x.fillStyle='#64748b';for(const sd of[-1,1])x.fillRect(W/2+sd*HW(G,Math.min(zg,1))*1.08-pw/2,gy-ph,pw,ph);x.fillRect(W/2-HW(G,Math.min(zg,1))*1.08,gy-ph,HW(G,Math.min(zg,1))*2.16,pw*.9);
+      /* اللوحات واضحة من البداية: بعرض الشاشة وهي بعيدة، ثم تنتقل فوق مساراتها مع الاقتراب */
+      const lw=HW(G,Math.min(zg,1))*2/n,slot=W*.94/n,k2=Math.max(0,Math.min(1,(zg-.3)/.7))**2;signs.forEach((s,k)=>{const el=s.el,sw=Math.max(lw*.9,slot-8),L=Math.max(2,[...el.textContent.trim()].length),fs=Math.max(12,Math.min(46,sw*.2,sw/(L*.62)));
+        el.style.display='';el.style.left=(W*.03+slot*(k+.5)+(LX(G,Math.min(zg,1),k)-W*.03-slot*(k+.5))*k2)+'px';el.style.top=(gy-ph+pw)+'px';el.style.width=sw+'px';el.style.minHeight=(sw*.42)+'px';el.style.fontSize=fs+'px';el.style.opacity=zg>1?Math.max(0,1-(zg-1)*6):1})}
+    else signs.forEach(s=>s.el.style.display='none');
+    const tx=LX(G,1,lane);carX=carX==null?tx:carX+(tx-carX)*Math.min(1,dt*10);car(carX,G.yc,Math.max(.6,Math.min(1.3,G.hw/220)),t);
+    if(res){const k=(now-res.a)/900;if(k<1){x.globalAlpha=1-k;x.font=`900 ${Math.round(H*.09)}px system-ui`;x.lineWidth=6;x.strokeStyle='#fff';x.strokeText(res.t,carX,G.yc-70-k*60);x.fillStyle=res.col;x.fillText(res.t,carX,G.yc-70-k*60);x.globalAlpha=1}}
+  })();
+  requestAnimationFrame(()=>{size();next()});
 }
 const COLORS=[['أحمر','#ef4444'],['أزرق','#3b82f6'],['أخضر','#22c55e'],['أصفر','#facc15'],['برتقالي','#f97316'],['بنفسجي','#a855f7'],['وردي','#ec4899'],['بني','#8b5a2b'],['أسود','#1f2937'],['رمادي','#9ca3af']];
 /* ================= حزمة الألعاب الأشهر (مستوحاة من أكثر ألعاب بوكي لعباً) ================= */
