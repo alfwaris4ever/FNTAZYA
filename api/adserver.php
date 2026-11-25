@@ -1,7 +1,13 @@
 <?php
-/* فنتازيا: خادم الإعلانات + إحصاءات الزيارات (بلا كوكيز وبلا بيانات شخصية).
-   يُستدعى من index.php، ويستخدم دواله: db() out() fail() authUser() body() ip() secretKey() h().
-   الإحصاءات: الزائر الفريد = بصمة يومية مشفّرة (اليوم + مفتاح سري + IP + المتصفح) تُحذف بعد يومين، ولا يُحفظ IP ولا أي معرّف دائم. */
+/* فنتازيا: خادم الإعلانات + بوابة المعلنين + إحصاءات الزيارات (بلا كوكيز وبلا بيانات شخصية).
+   يُستدعى من index.php، ويستخدم دواله: db() out() fail() authUser() body() ip() secretKey() h() sendMail() cleanEmail().
+   ترتيب العرض في كل مساحة:
+     1) حجز حصري بالأيام (معلن واحد يملك المساحة في أيامه)
+     2) حملات مرات الظهور (CPM) بالتناوب، موزّعة بالتساوي على أيام الحملة
+     3) كود شبكة إعلانية إن رُبط بالمساحة
+     4) الإعلانات الرديفة (إعلانات الموقع نفسه، أقل أولوية، ولا تُحذف)
+     5) «أعلن هنا»
+   شرط: لا يظهر نفس المعلن مرتين في الصفحة الواحدة؛ المساحة الثانية تأخذ معلناً آخر أو إعلاناً رديفاً. */
 
 /* لكل مساحة مقاس صورة لكل جهاز: d كمبيوتر (1024px فأكثر)، t تابلت (601-1023px)، m جوال (600px فأقل) */
 const AD_SLOTS = [
@@ -10,6 +16,14 @@ const AD_SLOTS = [
   'game_side'  => ['t' => 'صفحة اللعبة: مربع جانبي', 'size' => 'كمبيوتر 300×250 · تابلت 728×90 · جوال 300×250', 'dev' => ['d' => [300, 250], 't' => [728, 90], 'm' => [300, 250]]],
   'between'    => ['t' => 'بين المراحل: داخل بطاقة النتيجة', 'size' => 'كل الأجهزة 320×100', 'dev' => ['d' => [320, 100]]],
 ];
+/* الأسعار المقترحة الافتراضية (ريال سعودي) وتُعدَّل من لوحة الإدارة */
+const AD_PRICE_DEFAULT = [
+  'home_top'   => ['cpm' => 25, 'daily' => 150],
+  'game_below' => ['cpm' => 20, 'daily' => 100],
+  'game_side'  => ['cpm' => 18, 'daily' => 80],
+  'between'    => ['cpm' => 30, 'daily' => 120],
+];
+const AD_SETTINGS_DEFAULT = ['currency' => 'ر.س', 'vat' => '0', 'min_impr' => '10000', 'min_days' => '3', 'pay_info' => ''];
 
 function adSchema(): void {
   static $done = false; if ($done) return; $done = true;
@@ -20,15 +34,20 @@ CREATE TABLE IF NOT EXISTS ad_campaigns(id INTEGER PRIMARY KEY, name TEXT, adver
   start TEXT, end TEXT, weight INTEGER DEFAULT 1, max_impr INTEGER DEFAULT 0, status TEXT DEFAULT 'active', report_token TEXT, created INTEGER);
 CREATE TABLE IF NOT EXISTS ad_stats(day TEXT, cid INTEGER, slot TEXT, impr INTEGER DEFAULT 0, clicks INTEGER DEFAULT 0, PRIMARY KEY(day,cid,slot));
 CREATE TABLE IF NOT EXISTS ad_slots(slot TEXT PRIMARY KEY, mode TEXT DEFAULT 'house', html TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS ad_pricing(slot TEXT PRIMARY KEY, cpm REAL, daily REAL, cpm_on INTEGER DEFAULT 1, daily_on INTEGER DEFAULT 1);
+CREATE TABLE IF NOT EXISTS ad_settings(k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS advertisers(id INTEGER PRIMARY KEY, email TEXT UNIQUE, pass_hash TEXT, company TEXT, name TEXT, phone TEXT, created INTEGER, last_seen INTEGER, suspended INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS adv_tokens(token_hash TEXT PRIMARY KEY, adv_id INTEGER, created INTEGER);
 SQL);
   $cols = array_column(db()->query('PRAGMA table_info(ad_campaigns)')->fetchAll(), 'name');
-  if (!in_array('creatives', $cols, true)) db()->exec("ALTER TABLE ad_campaigns ADD COLUMN creatives TEXT DEFAULT ''");
+  $add = ['creatives' => "TEXT DEFAULT ''", 'ctype' => "TEXT DEFAULT 'paid'", 'pricing' => "TEXT DEFAULT 'cpm'", 'price' => 'REAL DEFAULT 0',
+    'adv_id' => 'INTEGER DEFAULT 0', 'note' => "TEXT DEFAULT ''", 'decided' => 'INTEGER DEFAULT 0'];
+  $firstFiller = !in_array('ctype', $cols, true);
+  foreach ($add as $c => $def) if (!in_array($c, $cols, true)) db()->exec("ALTER TABLE ad_campaigns ADD COLUMN $c $def");
+  // الإعلانات التجريبية تتحول إلى إعلانات رديفة
+  if ($firstFiller) db()->exec("UPDATE ad_campaigns SET ctype='filler', advertiser='فنتازيا (رديف)', weight=1, max_impr=0, start='', end='' WHERE advertiser LIKE 'تجريبي%'");
 }
-/* صور الحملة لكل مساحة ولكل جهاز: {slot:{d:url,t:url,m:url}} */
-function creativesOf(array $c): array {
-  $cr = json_decode((string)($c['creatives'] ?? ''), true);
-  return is_array($cr) ? $cr : [];
-}
+function creativesOf(array $c): array { $cr = json_decode((string)($c['creatives'] ?? ''), true); return is_array($cr) ? $cr : []; }
 function saveUpload(string $data): string {
   if (!preg_match('#^data:image/(png|jpe?g|webp|gif);base64,(.+)$#', $data, $m)) fail('صيغة الصورة غير مدعومة (PNG أو JPG أو WEBP أو GIF)');
   $bin = base64_decode($m[2], true);
@@ -40,11 +59,11 @@ function saveUpload(string $data): string {
   if (!@file_put_contents("$dir/$name", $bin)) fail('تعذّر حفظ الصورة على الخادم', 500);
   return "/ads-media/$name";
 }
-function cleanImg($u): string {
-  $u = (string)$u;
-  return preg_match('#^/ads-media/[\w.-]+$#', $u) ? $u : cleanUrl($u);
-}
+function cleanUrl($u): string { $u = trim((string)$u); return preg_match('#^https?://[^\s"<>]+$#i', $u) ? mb_substr($u, 0, 500) : ''; }
+function cleanImg($u): string { $u = (string)$u; return preg_match('#^/ads-media/[\w.-]+$#', $u) ? $u : cleanUrl($u); }
+function cleanDate($x): string { return preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$x) ? (string)$x : ''; }
 function today(): string { return gmdate('Y-m-d', time() + 3 * 3600); } // توقيت السعودية
+function dayDiff(string $a, string $b): int { return (int)round((strtotime($b . ' 00:00:00 UTC') - strtotime($a . ' 00:00:00 UTC')) / 86400); }
 function anInc(string $k, string $v, int $by = 1): void {
   $v = mb_substr($v, 0, 80);
   db()->prepare('INSERT OR IGNORE INTO an(day,k,v,n) VALUES(?,?,?,0)')->execute([today(), $k, $v]);
@@ -56,7 +75,6 @@ function adStat(int $cid, string $slot, string $col): void {
   db()->prepare("UPDATE ad_stats SET $col=$col+1 WHERE day=? AND cid=? AND slot=?")->execute([today(), $cid, $slot]);
 }
 function requireAdmin(): array { $u = authUser(); if (!in_array($u['email'], ADMIN_EMAILS, true)) fail('غير مصرّح', 403); return $u; }
-function cleanUrl($u): string { $u = trim((string)$u); return preg_match('#^https?://[^\s"<>]+$#i', $u) ? mb_substr($u, 0, 500) : ''; }
 function campaignTotals(int $cid): array {
   $st = db()->prepare('SELECT COALESCE(SUM(impr),0) i, COALESCE(SUM(clicks),0) c FROM ad_stats WHERE cid=?'); $st->execute([$cid]); return $st->fetch();
 }
@@ -65,9 +83,121 @@ function isLive(array $c): bool {
   if ($c['status'] !== 'active') return false;
   if ($c['start'] && $d < $c['start']) return false;
   if ($c['end'] && $d > $c['end']) return false;
-  if ((int)$c['max_impr'] > 0 && (int)campaignTotals((int)$c['id'])['i'] >= (int)$c['max_impr']) return false;
+  if (($c['ctype'] ?? 'paid') !== 'filler' && (int)$c['max_impr'] > 0 && (int)campaignTotals((int)$c['id'])['i'] >= (int)$c['max_impr']) return false;
   return true;
 }
+function advKey(array $c): string { return (int)($c['adv_id'] ?? 0) > 0 ? 'a' . (int)$c['adv_id'] : 'n' . substr(md5(mb_strtolower(trim((string)$c['advertiser']))), 0, 8); }
+
+/* ---------- الأسعار والإعدادات ---------- */
+function adSettings(): array {
+  $s = AD_SETTINGS_DEFAULT;
+  foreach (db()->query('SELECT k, v FROM ad_settings')->fetchAll() as $r) if (array_key_exists($r['k'], $s)) $s[$r['k']] = (string)$r['v'];
+  return $s;
+}
+function adPricing(): array {
+  $p = [];
+  foreach (AD_SLOTS as $k => $v) $p[$k] = ['cpm' => (float)AD_PRICE_DEFAULT[$k]['cpm'], 'daily' => (float)AD_PRICE_DEFAULT[$k]['daily'], 'cpm_on' => 1, 'daily_on' => 1];
+  foreach (db()->query('SELECT * FROM ad_pricing')->fetchAll() as $r) if (isset($p[$r['slot']]))
+    $p[$r['slot']] = ['cpm' => (float)$r['cpm'], 'daily' => (float)$r['daily'], 'cpm_on' => (int)$r['cpm_on'], 'daily_on' => (int)$r['daily_on']];
+  return $p;
+}
+/* متوسط المشاهدات اليومية الفعلية لكل مساحة خلال 14 يوماً (يشمل الإعلانات الرديفة، فهي تقيس المخزون المتاح) */
+function slotDailyAvg(): array {
+  $from = gmdate('Y-m-d', time() + 3 * 3600 - 13 * 86400);
+  $st = db()->prepare('SELECT slot, SUM(impr) n, COUNT(DISTINCT day) d FROM ad_stats WHERE day>=? GROUP BY slot'); $st->execute([$from]);
+  $o = array_fill_keys(array_keys(AD_SLOTS), 0);
+  foreach ($st->fetchAll() as $r) if (isset($o[$r['slot']])) $o[$r['slot']] = (int)round($r['n'] / max(1, (int)$r['d']));
+  return $o;
+}
+/* حساب قيمة الحملة: بمرات الظهور (لكل مساحة) أو بالحجز الحصري اليومي */
+function adQuote(array $slots, string $pricing, string $start, string $end, int $impr, int $exceptId = 0, bool $strict = true): array {
+  $S = adSettings(); $P = adPricing(); $avg = slotDailyAvg();
+  $slots = array_values(array_intersect($slots, array_keys(AD_SLOTS)));
+  if (!$slots) fail('اختر مساحة إعلانية واحدة على الأقل');
+  $pricing = $pricing === 'daily' ? 'daily' : 'cpm';
+  if (!$start) $start = today();
+  if ($strict && $start < today()) fail('تاريخ البداية لا يمكن أن يكون في الماضي');
+  if ($end && $end < $start) fail('تاريخ النهاية قبل تاريخ البداية');
+  $days = $end ? dayDiff($start, $end) + 1 : 0;
+  if ($days > 366) fail('أقصى مدة للحملة سنة');
+  $lines = []; $sub = 0.0; $warn = [];
+  if ($pricing === 'daily') {
+    if (!$end) fail('حدد تاريخ النهاية للحجز اليومي');
+    if ($strict && $days < (int)$S['min_days']) fail('أقل مدة للحجز الحصري ' . (int)$S['min_days'] . ' أيام');
+  } else {
+    if ($strict && $impr < (int)$S['min_impr']) fail('أقل عدد مرات ظهور ' . number_format((int)$S['min_impr']));
+    if ($impr > 10000000) fail('عدد مرات الظهور كبير جداً');
+  }
+  foreach ($slots as $s) {
+    if ($pricing === 'daily') {
+      if (!$P[$s]['daily_on']) fail('الحجز اليومي غير متاح حالياً لمساحة: ' . AD_SLOTS[$s]['t']);
+      // التحقق من عدم تداخل حجز حصري آخر في نفس المساحة
+      $st = db()->prepare("SELECT name, start, end FROM ad_campaigns WHERE pricing='daily' AND ctype='paid' AND status IN ('pending','active','paused') AND id<>? AND (','||slots||',') LIKE ? AND start<=? AND end>=?");
+      $st->execute([$exceptId, '%,' . $s . ',%', $end, $start]);
+      if ($bk = $st->fetch()) fail('المساحة «' . AD_SLOTS[$s]['t'] . '» محجوزة حصرياً من ' . $bk['start'] . ' إلى ' . $bk['end'] . '. اختر تواريخ أخرى أو باقة مرات الظهور');
+      $cost = $days * $P[$s]['daily'];
+      $lines[] = ['slot' => $s, 't' => AD_SLOTS[$s]['t'], 'qty' => $days, 'unit' => $P[$s]['daily'], 'desc' => "$days يوم × " . $P[$s]['daily'], 'cost' => round($cost, 2), 'est' => $avg[$s] * $days];
+    } else {
+      if (!$P[$s]['cpm_on']) fail('باقة مرات الظهور غير متاحة حالياً لمساحة: ' . AD_SLOTS[$s]['t']);
+      $cost = $impr / 1000 * $P[$s]['cpm'];
+      $estDays = $avg[$s] > 0 ? (int)ceil($impr / $avg[$s]) : 0;
+      if ($days && $avg[$s] > 0 && $estDays > $days) $warn[] = 'قد لا تكتمل مرات ظهور «' . AD_SLOTS[$s]['t'] . '» خلال المدة المحددة (تحتاج قرابة ' . $estDays . ' يوماً حسب الزيارات الحالية)';
+      $lines[] = ['slot' => $s, 't' => AD_SLOTS[$s]['t'], 'qty' => $impr, 'unit' => $P[$s]['cpm'], 'desc' => number_format($impr) . ' ظهور × ' . $P[$s]['cpm'] . ' لكل 1000', 'cost' => round($cost, 2), 'estDays' => $estDays];
+    }
+    $sub += $cost;
+  }
+  $vat = round($sub * (float)$S['vat'] / 100, 2);
+  return ['pricing' => $pricing, 'start' => $start, 'end' => $end, 'days' => $days, 'impr' => $impr, 'lines' => $lines, 'subtotal' => round($sub, 2), 'vatRate' => (float)$S['vat'], 'vat' => $vat, 'total' => round($sub + $vat, 2), 'currency' => $S['currency'], 'warnings' => $warn];
+}
+function slotInfo(): array {
+  $P = adPricing(); $avg = slotDailyAvg(); $o = [];
+  foreach (AD_SLOTS as $k => $v) $o[] = ['slot' => $k, 't' => $v['t'], 'size' => $v['size'], 'dev' => $v['dev'], 'price' => $P[$k], 'avg' => $avg[$k]];
+  return $o;
+}
+
+/* ---------- حفظ صور الحملة ---------- */
+function buildCreatives(array $b, string $slots): array {
+  $creatives = []; $img = '';
+  $in = is_array($b['creatives'] ?? null) ? $b['creatives'] : [];
+  foreach (explode(',', $slots) as $s) {
+    foreach (array_keys(AD_SLOTS[$s]['dev']) as $dv) {
+      $v = $in[$s][$dv] ?? '';
+      $u = is_string($v) && strncmp($v, 'data:image/', 11) === 0 ? saveUpload($v) : cleanImg($v);
+      if ($u !== '') $creatives[$s][$dv] = $u;
+    }
+    if (empty($creatives[$s])) fail('أضف صورة واحدة على الأقل لمساحة: ' . AD_SLOTS[$s]['t']);
+    if (!$img) $img = $creatives[$s]['d'] ?? reset($creatives[$s]);
+  }
+  return [$creatives, $img];
+}
+function slotsFrom($x): string { return implode(',', array_values(array_intersect((array)$x, array_keys(AD_SLOTS)))); }
+function catsFrom($x): string { return implode(',', array_filter(array_map(fn($v) => preg_replace('/[^\w-]/', '', (string)$v), (array)$x))); }
+
+/* ---------- حسابات المعلنين ---------- */
+function authAdv(): array {
+  $h = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+  $t = preg_match('/Bearer\s+([a-f0-9]{48})/i', $h, $m) ? $m[1] : '';
+  if (!$t) fail('سجّل دخولك من جديد', 401);
+  $st = db()->prepare('SELECT a.* FROM adv_tokens t JOIN advertisers a ON a.id=t.adv_id WHERE t.token_hash=? AND t.created>?');
+  $st->execute([hash('sha256', $t), time() - 60 * 86400]); $u = $st->fetch();
+  if (!$u) fail('سجّل دخولك من جديد', 401);
+  if (!empty($u['suspended'])) fail('هذا الحساب موقوف. تواصل مع فنتازيا', 403);
+  db()->prepare('UPDATE advertisers SET last_seen=? WHERE id=?')->execute([time(), $u['id']]);
+  return $u;
+}
+function advToken(int $id): string { $t = bin2hex(random_bytes(24)); db()->prepare('INSERT INTO adv_tokens(token_hash,adv_id,created) VALUES(?,?,?)')->execute([hash('sha256', $t), $id, time()]); return $t; }
+function advPublic(array $u): array { return ['id' => (int)$u['id'], 'email' => $u['email'], 'company' => $u['company'], 'name' => $u['name'], 'phone' => $u['phone']]; }
+function advLimit(string $email): void {
+  $since = time() - 900;
+  $a = db()->prepare('SELECT COUNT(*) FROM attempts WHERE email=? AND ts>?'); $a->execute(['adv:' . $email, $since]);
+  $b = db()->prepare('SELECT COUNT(*) FROM attempts WHERE ip=? AND ts>?'); $b->execute([ip(), $since]);
+  if ($a->fetchColumn() >= 6 || $b->fetchColumn() >= 30) fail('محاولات كثيرة، جرّب بعد ربع ساعة', 429);
+}
+function campaignRow(array $c): array {
+  $t = campaignTotals((int)$c['id']); $c['impr'] = (int)$t['i']; $c['clicks'] = (int)$t['c']; $c['live'] = isLive($c);
+  return $c;
+}
+function money($v, array $S): string { return number_format((float)$v, 2) . ' ' . $S['currency']; }
 
 adSchema();
 $a = $_GET['a'] ?? '';
@@ -79,28 +209,42 @@ switch ($a) {
     header('Cache-Control: no-store');
     $want = array_values(array_intersect(explode(',', (string)($_GET['s'] ?? '')), array_keys(AD_SLOTS)));
     $cat = preg_replace('/[^\w-]/', '', (string)($_GET['c'] ?? ''));
-    $camps = db()->query("SELECT * FROM ad_campaigns WHERE status='active'")->fetchAll();
+    $used = array_filter(explode(',', preg_replace('/[^\w,]/', '', (string)($_GET['x'] ?? ''))));
+    $camps = array_values(array_filter(db()->query("SELECT * FROM ad_campaigns WHERE status='active'")->fetchAll(), 'isLive'));
     $settings = []; foreach (db()->query('SELECT * FROM ad_slots')->fetchAll() as $r) $settings[$r['slot']] = $r;
+    $pick = function (array $pool, callable $w) { // اختيار عشوائي موزون
+      $tot = 0; $ws = []; foreach ($pool as $i => $c) { $ws[$i] = max(0.0001, (float)$w($c)); $tot += $ws[$i]; }
+      $r = mt_rand() / mt_getrandmax() * $tot; foreach ($pool as $i => $c) { $r -= $ws[$i]; if ($r <= 0) return $c; } return end($pool);
+    };
     $outS = [];
     foreach ($want as $slot) {
-      $pool = [];
-      foreach ($camps as $c) {
-        if (!in_array($slot, explode(',', (string)$c['slots']), true)) continue;
-        $cats = array_filter(explode(',', (string)$c['cats']));
-        if ($cats && !in_array($cat, $cats, true)) continue;
-        if (!isLive($c)) continue;
-        for ($i = 0; $i < max(1, min(10, (int)$c['weight'])); $i++) $pool[] = $c;
+      $elig = array_filter($camps, function ($c) use ($slot, $cat) {
+        if (!in_array($slot, explode(',', (string)$c['slots']), true)) return false;
+        $cats = array_filter(explode(',', (string)$c['cats'])); return !$cats || in_array($cat, $cats, true);
+      });
+      $paid = array_filter($elig, fn($c) => ($c['ctype'] ?? 'paid') !== 'filler' && !in_array(advKey($c), $used, true));
+      $excl = array_filter($paid, fn($c) => $c['pricing'] === 'daily');
+      $c = null;
+      if ($excl) $c = $pick(array_values($excl), fn($x) => 1);
+      elseif ($paid) $c = $pick(array_values($paid), function ($x) { // توزيع متساوٍ: المتبقي ÷ الأيام المتبقية
+        $rem = (int)$x['max_impr'] > 0 ? max(1, (int)$x['max_impr'] - (int)campaignTotals((int)$x['id'])['i']) : 1000;
+        $left = $x['end'] ? max(1, dayDiff(today(), $x['end']) + 1) : 30;
+        return $rem / $left * max(1, (int)$x['weight']);
+      });
+      if (!$c) {
+        $s = $settings[$slot] ?? ['mode' => 'house', 'html' => ''];
+        if ($s['mode'] === 'html' && trim((string)$s['html']) !== '') { $outS[$slot] = ['type' => 'network', 'html' => $s['html']]; continue; }
+        $fill = array_filter($elig, fn($x) => ($x['ctype'] ?? '') === 'filler');
+        if ($fill) $c = $pick(array_values($fill), fn($x) => max(1, (int)$x['weight']));
+        elseif ($s['mode'] === 'off') { $outS[$slot] = ['type' => 'off']; continue; }
+        else { $outS[$slot] = ['type' => 'house']; continue; }
       }
-      if ($pool) {
-        $c = $pool[random_int(0, count($pool) - 1)];
-        $cr = creativesOf($c)[$slot] ?? [];
-        $outS[$slot] = ['type' => $c['kind'] === 'html' ? 'html' : 'image', 'cid' => (int)$c['id'], 'img' => ($cr['d'] ?? '') ?: ($cr['t'] ?? '') ?: ($cr['m'] ?? '') ?: $c['img'],
-          'img_t' => $cr['t'] ?? '', 'img_m' => $cr['m'] ?? '', 'html' => $c['kind'] === 'html' ? $c['html'] : '',
-          'alt' => $c['alt'] ?: $c['advertiser'], 'click' => $c['link'] ? 'api/index.php?a=adclick&c=' . (int)$c['id'] . '&s=' . $slot : ''];
-      } else {
-        $s = $settings[$slot] ?? ['mode' => $slot === 'between' ? 'off' : 'house', 'html' => ''];
-        $outS[$slot] = $s['mode'] === 'html' && trim((string)$s['html']) !== '' ? ['type' => 'network', 'html' => $s['html']] : ['type' => $s['mode'] === 'off' ? 'off' : 'house'];
-      }
+      if (($c['ctype'] ?? '') !== 'filler') $used[] = advKey($c);
+      $cr = creativesOf($c)[$slot] ?? [];
+      $outS[$slot] = ['type' => $c['kind'] === 'html' ? 'html' : 'image', 'cid' => (int)$c['id'], 'k' => ($c['ctype'] ?? '') === 'filler' ? '' : advKey($c),
+        'img' => ($cr['d'] ?? '') ?: ($cr['t'] ?? '') ?: ($cr['m'] ?? '') ?: $c['img'], 'img_t' => $cr['t'] ?? '', 'img_m' => $cr['m'] ?? '',
+        'html' => $c['kind'] === 'html' ? $c['html'] : '', 'alt' => $c['alt'] ?: $c['advertiser'],
+        'click' => $c['link'] ? 'api/index.php?a=adclick&c=' . (int)$c['id'] . '&s=' . $slot : ''];
     }
     out(['ok' => true, 'slots' => $outS]);
   }
@@ -154,6 +298,11 @@ switch ($a) {
     out(['ok' => true, 'views30' => (int)($r['views'] ?? 0), 'visitors30' => (int)($r['uv'] ?? 0)]);
   }
 
+  case 'adpricing': { // الأسعار العامة للمساحات
+    $S = adSettings(); unset($S['pay_info']);
+    out(['ok' => true, 'slots' => slotInfo(), 'settings' => $S]);
+  }
+
   case 'report': { // تقرير الحملة للمعلن عبر رابط سري
     $t = (string)($_GET['t'] ?? '');
     if (!preg_match('/^[a-f0-9]{32}$/', $t)) fail('رابط غير صالح', 404);
@@ -161,8 +310,82 @@ switch ($a) {
     if (!$c) fail('رابط غير صالح', 404);
     $d = db()->prepare('SELECT day, SUM(impr) impr, SUM(clicks) clicks FROM ad_stats WHERE cid=? GROUP BY day ORDER BY day'); $d->execute([$c['id']]);
     $s = db()->prepare('SELECT slot, SUM(impr) impr, SUM(clicks) clicks FROM ad_stats WHERE cid=? GROUP BY slot'); $s->execute([$c['id']]);
-    out(['ok' => true, 'campaign' => ['name' => $c['name'], 'advertiser' => $c['advertiser'], 'start' => $c['start'], 'end' => $c['end'], 'status' => $c['status'], 'live' => isLive($c)],
+    out(['ok' => true, 'campaign' => ['name' => $c['name'], 'advertiser' => $c['advertiser'], 'start' => $c['start'], 'end' => $c['end'], 'status' => $c['status'], 'live' => isLive($c),
+      'pricing' => $c['pricing'], 'booked' => (int)$c['max_impr']],
       'totals' => campaignTotals((int)$c['id']), 'daily' => $d->fetchAll(), 'slots' => $s->fetchAll(), 'slotNames' => array_map(fn($x) => $x['t'], AD_SLOTS)]);
+  }
+
+  /* ---------- بوابة المعلنين ---------- */
+  case 'adv_register': {
+    $email = cleanEmail($b['email'] ?? ''); $pass = (string)($b['password'] ?? '');
+    advLimit($email);
+    if (mb_strlen($pass) < 8) fail('كلمة المرور 8 أحرف على الأقل');
+    $company = mb_substr(trim(strip_tags((string)($b['company'] ?? ''))), 0, 100); $name = mb_substr(trim(strip_tags((string)($b['name'] ?? ''))), 0, 80);
+    $phone = mb_substr(preg_replace('/[^\d+ ]/', '', (string)($b['phone'] ?? '')), 0, 30);
+    if ($company === '' || $name === '') fail('اكتب اسمك واسم الشركة');
+    $ex = db()->prepare('SELECT id FROM advertisers WHERE email=?'); $ex->execute([$email]);
+    if ($ex->fetch()) fail('هذا البريد مسجّل. اختر «تسجيل الدخول»');
+    db()->prepare('INSERT INTO advertisers(email,pass_hash,company,name,phone,created,last_seen) VALUES(?,?,?,?,?,?,?)')->execute([$email, password_hash($pass, PASSWORD_DEFAULT), $company, $name, $phone, time(), time()]);
+    $id = (int)db()->lastInsertId(); $st = db()->prepare('SELECT * FROM advertisers WHERE id=?'); $st->execute([$id]);
+    out(['ok' => true, 'token' => advToken($id), 'adv' => advPublic($st->fetch())]);
+  }
+  case 'adv_login': {
+    $email = cleanEmail($b['email'] ?? ''); advLimit($email);
+    $st = db()->prepare('SELECT * FROM advertisers WHERE email=?'); $st->execute([$email]); $u = $st->fetch();
+    if (!$u || !password_verify((string)($b['password'] ?? ''), $u['pass_hash'])) {
+      db()->prepare('INSERT INTO attempts(email,ip,ts) VALUES(?,?,?)')->execute(['adv:' . $email, ip(), time()]);
+      fail($u ? 'كلمة المرور غير صحيحة' : 'لا يوجد حساب معلن بهذا البريد');
+    }
+    if (!empty($u['suspended'])) fail('هذا الحساب موقوف. تواصل مع فنتازيا', 403);
+    out(['ok' => true, 'token' => advToken((int)$u['id']), 'adv' => advPublic($u)]);
+  }
+  case 'adv_me': {
+    $u = authAdv(); $S = adSettings();
+    $st = db()->prepare('SELECT * FROM ad_campaigns WHERE adv_id=? ORDER BY created DESC'); $st->execute([$u['id']]);
+    $list = array_map('campaignRow', $st->fetchAll());
+    out(['ok' => true, 'adv' => advPublic($u), 'campaigns' => $list, 'slots' => slotInfo(), 'settings' => $S]);
+  }
+  case 'adv_quote': {
+    authAdv();
+    out(['ok' => true, 'quote' => adQuote(slotsFrom($b['slots'] ?? []) ? explode(',', slotsFrom($b['slots'] ?? [])) : [], (string)($b['pricing'] ?? 'cpm'), cleanDate($b['start'] ?? ''), cleanDate($b['end'] ?? ''), (int)($b['impr'] ?? 0), (int)($b['id'] ?? 0))]);
+  }
+  case 'adv_save': {
+    $u = authAdv(); $S = adSettings();
+    $id = (int)($b['id'] ?? 0);
+    if ($id) { $st = db()->prepare("SELECT * FROM ad_campaigns WHERE id=? AND adv_id=?"); $st->execute([$id, $u['id']]); $old = $st->fetch();
+      if (!$old) fail('الحملة غير موجودة', 404); if (!in_array($old['status'], ['pending', 'rejected'], true)) fail('لا يمكن تعديل حملة بعد الموافقة عليها. تواصل مع فنتازيا'); }
+    $slots = slotsFrom($b['slots'] ?? []);
+    $q = adQuote($slots ? explode(',', $slots) : [], (string)($b['pricing'] ?? 'cpm'), cleanDate($b['start'] ?? ''), cleanDate($b['end'] ?? ''), (int)($b['impr'] ?? 0), $id);
+    if (!cleanUrl($b['link'] ?? '')) fail('أضف رابط موقعك أو صفحة المنتج (يبدأ بـ https://)');
+    [$creatives, $img] = buildCreatives($b, $slots);
+    $name = mb_substr(trim(strip_tags((string)($b['name'] ?? ''))), 0, 100) ?: 'حملة ' . $u['company'];
+    $vals = [$name, $u['company'], $slots, catsFrom($b['cats'] ?? []), 'image', $img, '', cleanUrl($b['link']), mb_substr(strip_tags((string)($b['alt'] ?? '')), 0, 150),
+      $q['start'], $q['end'], 1, $q['pricing'] === 'cpm' ? $q['impr'] : 0, 'pending', json_encode($creatives, JSON_UNESCAPED_SLASHES), 'paid', $q['pricing'], $q['total'], (int)$u['id']];
+    if ($id) { $vals[] = $id; db()->prepare('UPDATE ad_campaigns SET name=?,advertiser=?,slots=?,cats=?,kind=?,img=?,html=?,link=?,alt=?,start=?,end=?,weight=?,max_impr=?,status=?,creatives=?,ctype=?,pricing=?,price=?,adv_id=?,note=\'\' WHERE id=?')->execute($vals); }
+    else { $vals[] = bin2hex(random_bytes(16)); $vals[] = time();
+      db()->prepare('INSERT INTO ad_campaigns(name,advertiser,slots,cats,kind,img,html,link,alt,start,end,weight,max_impr,status,creatives,ctype,pricing,price,adv_id,report_token,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($vals); $id = (int)db()->lastInsertId(); }
+    try {
+      $rows = '<p style="font-size:15px;line-height:1.9">الحملة: <b>' . h($name) . '</b><br>المعلن: ' . h($u['company']) . ' (' . h($u['email']) . ' · ' . h($u['phone']) . ')<br>'
+        . ($q['pricing'] === 'daily' ? 'حجز حصري من ' . $q['start'] . ' إلى ' . $q['end'] : number_format($q['impr']) . ' مرة ظهور') . '<br>القيمة: <b>' . money($q['total'], $S) . '</b></p>'
+        . '<p><a href="https://fntazya.com/admin.html#ads" style="background:#5b3cff;color:#fff;padding:10px 20px;border-radius:99px;text-decoration:none;font-weight:bold">مراجعة الحملة</a></p>';
+      foreach (ADMIN_EMAILS as $to) sendMail($to, 'حملة إعلانية جديدة بانتظار الموافقة: ' . $u['company'], 'حملة جديدة بانتظار الموافقة 📢', $rows, "حملة جديدة من {$u['company']}: $name - " . money($q['total'], $S));
+      $pay = trim($S['pay_info']) !== '' ? '<p style="font-size:15px;line-height:1.9;background:#f5f3ff;padding:12px;border-radius:12px"><b>طريقة الدفع:</b><br>' . nl2br(h($S['pay_info'])) . '</p>' : '<p>سيتواصل معك فريق فنتازيا لإتمام الدفع.</p>';
+      sendMail($u['email'], 'استلمنا طلب حملتك الإعلانية في فنتازيا', 'استلمنا طلب حملتك ✅',
+        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($u['name']) . '،<br>استلمنا طلب الحملة <b>' . h($name) . '</b> بقيمة <b>' . money($q['total'], $S) . '</b>. بعد إتمام الدفع نراجع الإعلان ونفعّله، ويصلك بريد بذلك.</p>' . $pay,
+        "استلمنا طلب حملتك $name بقيمة " . money($q['total'], $S));
+    } catch (Throwable $e) { error_log('adv_save mail: ' . $e->getMessage()); }
+    out(['ok' => true, 'id' => $id, 'quote' => $q, 'pay_info' => $S['pay_info']]);
+  }
+  case 'adv_cancel': {
+    $u = authAdv(); $id = (int)($b['id'] ?? 0);
+    $st = db()->prepare("DELETE FROM ad_campaigns WHERE id=? AND adv_id=? AND status IN ('pending','rejected')"); $st->execute([$id, $u['id']]);
+    if (!$st->rowCount()) fail('لا يمكن حذف هذه الحملة');
+    out(['ok' => true]);
+  }
+  case 'adv_logout': {
+    $h = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if (preg_match('/Bearer\s+([a-f0-9]{48})/i', $h, $m)) db()->prepare('DELETE FROM adv_tokens WHERE token_hash=?')->execute([hash('sha256', $m[1])]);
+    out(['ok' => true]);
   }
 
   /* ---------- لوحة الإدارة ---------- */
@@ -177,49 +400,93 @@ switch ($a) {
 
   case 'adm_ads': {
     requireAdmin();
-    $list = db()->query('SELECT * FROM ad_campaigns ORDER BY created DESC')->fetchAll();
-    foreach ($list as &$c) { $t = campaignTotals((int)$c['id']); $c['impr'] = (int)$t['i']; $c['clicks'] = (int)$t['c']; $c['live'] = isLive($c); }
-    $slots = []; foreach (AD_SLOTS as $k => $v) { $st = db()->prepare('SELECT mode, html FROM ad_slots WHERE slot=?'); $st->execute([$k]); $r = $st->fetch() ?: ['mode' => $k === 'between' ? 'off' : 'house', 'html' => ''];
-      $i = db()->prepare('SELECT COALESCE(SUM(impr),0) i, COALESCE(SUM(clicks),0) c FROM ad_stats WHERE slot=?'); $i->execute([$k]); $slots[] = ['slot' => $k] + $v + $r + $i->fetch(); }
+    $list = array_map('campaignRow', db()->query('SELECT c.*, a.email adv_email, a.phone adv_phone, a.name adv_name FROM ad_campaigns c LEFT JOIN advertisers a ON a.id=c.adv_id ORDER BY c.created DESC')->fetchAll());
+    $slots = slotInfo();
+    foreach ($slots as &$s) { $st = db()->prepare('SELECT mode, html FROM ad_slots WHERE slot=?'); $st->execute([$s['slot']]); $r = $st->fetch() ?: ['mode' => 'house', 'html' => ''];
+      $i = db()->prepare('SELECT COALESCE(SUM(impr),0) i, COALESCE(SUM(clicks),0) c FROM ad_stats WHERE slot=?'); $i->execute([$s['slot']]); $s += $r + $i->fetch(); }
     $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__)), '/');
-    out(['ok' => true, 'campaigns' => $list, 'slots' => $slots, 'adstxt' => is_file("$root/ads.txt") ? (string)file_get_contents("$root/ads.txt") : '']);
+    out(['ok' => true, 'campaigns' => $list, 'slots' => $slots, 'settings' => adSettings(), 'advertisers' => (int)db()->query('SELECT COUNT(*) FROM advertisers')->fetchColumn(),
+      'adstxt' => is_file("$root/ads.txt") ? (string)file_get_contents("$root/ads.txt") : '']);
+  }
+
+  case 'adm_quote': {
+    requireAdmin();
+    $slots = slotsFrom($b['slots'] ?? []);
+    out(['ok' => true, 'quote' => adQuote($slots ? explode(',', $slots) : [], (string)($b['pricing'] ?? 'cpm'), cleanDate($b['start'] ?? ''), cleanDate($b['end'] ?? ''), (int)($b['impr'] ?? 0), (int)($b['id'] ?? 0), false)]);
   }
 
   case 'adm_ad_save': {
     requireAdmin();
-    $id = (int)($b['id'] ?? 0);
-    $slots = implode(',', array_values(array_intersect((array)($b['slots'] ?? []), array_keys(AD_SLOTS))));
+    $id = (int)($b['id'] ?? 0); $old = null;
+    if ($id) { $st = db()->prepare('SELECT * FROM ad_campaigns WHERE id=?'); $st->execute([$id]); $old = $st->fetch(); if (!$old) fail('الحملة غير موجودة', 404); }
+    $slots = slotsFrom($b['slots'] ?? []);
     if ($slots === '') fail('اختر مساحة إعلانية واحدة على الأقل');
+    $ctype = ($old['ctype'] ?? ($b['ctype'] ?? 'paid')) === 'filler' ? 'filler' : 'paid';
     $kind = ($b['kind'] ?? '') === 'html' ? 'html' : 'image';
     $creatives = []; $img = '';
-    if ($kind === 'image') {
-      $in = is_array($b['creatives'] ?? null) ? $b['creatives'] : [];
-      foreach (explode(',', $slots) as $s) {
-        foreach (array_keys(AD_SLOTS[$s]['dev']) as $dv) {
-          $v = $in[$s][$dv] ?? '';
-          $u = is_string($v) && strncmp($v, 'data:image/', 11) === 0 ? saveUpload($v) : cleanImg($v);
-          if ($u !== '') $creatives[$s][$dv] = $u;
-        }
-        if (empty($creatives[$s])) fail('أضف صورة واحدة على الأقل لمساحة: ' . AD_SLOTS[$s]['t']);
-        if (!$img) $img = $creatives[$s]['d'] ?? reset($creatives[$s]);
-      }
-    }
+    if ($kind === 'image') [$creatives, $img] = buildCreatives($b, $slots);
     $html = $kind === 'html' ? mb_substr((string)($b['html'] ?? ''), 0, 20000) : '';
     if ($kind === 'html' && trim($html) === '') fail('ألصق كود الإعلان');
-    $dt = fn($x) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$x) ? (string)$x : '';
-    $vals = [mb_substr(trim((string)($b['name'] ?? '')), 0, 100) ?: 'حملة بدون اسم', mb_substr(trim((string)($b['advertiser'] ?? '')), 0, 100), $slots,
-      implode(',', array_filter(array_map(fn($x) => preg_replace('/[^\w-]/', '', (string)$x), (array)($b['cats'] ?? [])))),
-      $kind, $img, $html, cleanUrl($b['link'] ?? ''), mb_substr((string)($b['alt'] ?? ''), 0, 150), $dt($b['start'] ?? ''), $dt($b['end'] ?? ''),
-      max(1, min(10, (int)($b['weight'] ?? 1))), max(0, (int)($b['max_impr'] ?? 0)), ($b['status'] ?? 'active') === 'paused' ? 'paused' : 'active',
-      $creatives ? json_encode($creatives, JSON_UNESCAPED_SLASHES) : ''];
-    if ($id) { $vals[] = $id; db()->prepare('UPDATE ad_campaigns SET name=?,advertiser=?,slots=?,cats=?,kind=?,img=?,html=?,link=?,alt=?,start=?,end=?,weight=?,max_impr=?,status=?,creatives=? WHERE id=?')->execute($vals); }
-    else { $vals[] = bin2hex(random_bytes(16)); $vals[] = time(); db()->prepare('INSERT INTO ad_campaigns(name,advertiser,slots,cats,kind,img,html,link,alt,start,end,weight,max_impr,status,creatives,report_token,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($vals); }
+    $pricing = ($b['pricing'] ?? 'cpm') === 'daily' ? 'daily' : 'cpm';
+    $start = cleanDate($b['start'] ?? ''); $end = cleanDate($b['end'] ?? ''); $impr = max(0, (int)($b['max_impr'] ?? 0));
+    $price = 0.0;
+    if ($ctype === 'paid') {
+      if ($pricing === 'daily' && (!$start || !$end)) fail('الحجز اليومي يحتاج تاريخ بداية ونهاية');
+      $q = adQuote(explode(',', $slots), $pricing, $start ?: today(), $end, $impr, $id, false);
+      $price = isset($b['price']) && $b['price'] !== '' ? max(0, (float)$b['price']) : $q['total'];
+      if ($pricing === 'daily') $impr = 0;
+    } else { $pricing = 'cpm'; $impr = 0; $start = ''; $end = ''; }
+    $status = in_array($b['status'] ?? '', ['active', 'paused', 'pending'], true) ? $b['status'] : 'active';
+    $vals = [mb_substr(trim((string)($b['name'] ?? '')), 0, 100) ?: 'حملة بدون اسم', $ctype === 'filler' ? 'فنتازيا (رديف)' : mb_substr(trim((string)($b['advertiser'] ?? '')), 0, 100), $slots,
+      catsFrom($b['cats'] ?? []), $kind, $img, $html, cleanUrl($b['link'] ?? ''), mb_substr((string)($b['alt'] ?? ''), 0, 150), $start, $end,
+      max(1, min(10, (int)($b['weight'] ?? 1))), $impr, $status, $creatives ? json_encode($creatives, JSON_UNESCAPED_SLASHES) : '', $ctype, $pricing, $price];
+    if ($id) { $vals[] = $id; db()->prepare('UPDATE ad_campaigns SET name=?,advertiser=?,slots=?,cats=?,kind=?,img=?,html=?,link=?,alt=?,start=?,end=?,weight=?,max_impr=?,status=?,creatives=?,ctype=?,pricing=?,price=? WHERE id=?')->execute($vals); }
+    else { $vals[] = bin2hex(random_bytes(16)); $vals[] = time(); db()->prepare('INSERT INTO ad_campaigns(name,advertiser,slots,cats,kind,img,html,link,alt,start,end,weight,max_impr,status,creatives,ctype,pricing,price,report_token,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute($vals); }
+    out(['ok' => true]);
+  }
+
+  case 'adm_ad_status': { // إيقاف/تشغيل
+    requireAdmin(); $id = (int)($b['id'] ?? 0); $s = ($b['status'] ?? '') === 'paused' ? 'paused' : 'active';
+    db()->prepare("UPDATE ad_campaigns SET status=? WHERE id=? AND status IN ('active','paused')")->execute([$s, $id]);
+    out(['ok' => true]);
+  }
+
+  case 'adm_ad_decide': { // الموافقة بعد الدفع أو الرفض
+    requireAdmin(); $S = adSettings();
+    $id = (int)($b['id'] ?? 0); $ok = ($b['decision'] ?? '') === 'approve'; $note = mb_substr(trim(strip_tags((string)($b['note'] ?? ''))), 0, 500);
+    $st = db()->prepare("SELECT c.*, a.email adv_email, a.name adv_name FROM ad_campaigns c LEFT JOIN advertisers a ON a.id=c.adv_id WHERE c.id=? AND c.status='pending'"); $st->execute([$id]); $c = $st->fetch();
+    if (!$c) fail('الحملة غير موجودة أو تمت مراجعتها');
+    if ($ok && $c['pricing'] === 'daily' && $c['end'] && $c['end'] < today()) fail('انتهت تواريخ هذا الحجز. اطلب من المعلن تعديل التواريخ');
+    db()->prepare('UPDATE ad_campaigns SET status=?, note=?, decided=? WHERE id=?')->execute([$ok ? 'active' : 'rejected', $note, time(), $id]);
+    if (!empty($c['adv_email'])) try {
+      $rep = 'https://fntazya.com/ad-report.html?t=' . $c['report_token'];
+      if ($ok) sendMail($c['adv_email'], 'تم تفعيل حملتك الإعلانية في فنتازيا', 'حملتك تعمل الآن 🎉',
+        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($c['adv_name']) . '،<br>تم تأكيد الدفع وتفعيل حملة <b>' . h($c['name']) . '</b>.' . ($note ? '<br>' . h($note) : '') . '</p><p><a href="' . h($rep) . '" style="background:#5b3cff;color:#fff;padding:10px 20px;border-radius:99px;text-decoration:none;font-weight:bold">تقرير الحملة المباشر</a></p>',
+        "تم تفعيل حملتك {$c['name']}. التقرير: $rep");
+      else sendMail($c['adv_email'], 'بخصوص حملتك الإعلانية في فنتازيا', 'حملتك تحتاج تعديلاً',
+        '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($c['adv_name']) . '،<br>لم نتمكن من تفعيل حملة <b>' . h($c['name']) . '</b>.' . ($note ? '<br><b>السبب:</b> ' . h($note) : '') . '<br>يمكنك تعديلها وإعادة إرسالها من <a href="https://fntazya.com/advertiser.html">بوابة المعلنين</a>.</p>',
+        "لم نتمكن من تفعيل حملتك {$c['name']}. $note");
+    } catch (Throwable $e) { error_log('decide mail: ' . $e->getMessage()); }
     out(['ok' => true]);
   }
 
   case 'adm_ad_del': {
     requireAdmin(); $id = (int)($b['id'] ?? 0);
+    $st = db()->prepare('SELECT ctype FROM ad_campaigns WHERE id=?'); $st->execute([$id]);
+    if ($st->fetchColumn() === 'filler') fail('الإعلانات الرديفة لا تُحذف، يمكنك تعديلها فقط');
     db()->prepare('DELETE FROM ad_stats WHERE cid=?')->execute([$id]); db()->prepare('DELETE FROM ad_campaigns WHERE id=?')->execute([$id]);
+    out(['ok' => true]);
+  }
+
+  case 'adm_pricing_save': {
+    requireAdmin();
+    foreach ((array)($b['pricing'] ?? []) as $slot => $p) {
+      if (!isset(AD_SLOTS[$slot]) || !is_array($p)) continue;
+      db()->prepare('INSERT OR REPLACE INTO ad_pricing(slot,cpm,daily,cpm_on,daily_on) VALUES(?,?,?,?,?)')
+        ->execute([$slot, max(0, (float)($p['cpm'] ?? 0)), max(0, (float)($p['daily'] ?? 0)), empty($p['cpm_on']) ? 0 : 1, empty($p['daily_on']) ? 0 : 1]);
+    }
+    foreach ((array)($b['settings'] ?? []) as $k => $v) if (array_key_exists($k, AD_SETTINGS_DEFAULT))
+      db()->prepare('INSERT OR REPLACE INTO ad_settings(k,v) VALUES(?,?)')->execute([$k, mb_substr((string)$v, 0, 2000)]);
     out(['ok' => true]);
   }
 
