@@ -3,6 +3,22 @@
 G.sea=(root,c)=>{
   const W=1000,H=600,goal=c.fi(8,34),nSh=c.fi(1,6),shSp=c.f(110,300),secs=40;let pts=0,lives=c.lv<10?3:c.lv<20?2:1,inv=0,face=1,items=[],sharks=[],bub=[],spT=0;
   const P={x:200,y:300};let pops=[];
+  /* حصان البحر: عدو يدخل ويطلق ليزر طولي أو عرضي 100 بكسل لكل جهة. من المتوسط (5 مرات بالمرحلة كحد أقصى)، والصعب أكثر */
+  const diff=c.run.diff,HS_MAX=diff===0?0:diff===1?5:c.fi(6,10),HS_AT=diff===2?2:1,BEAM=100;let hs=[],hsCount=0,hsT=rnd(4,7);
+  function hurt(msg){if(inv)return;lives--;inv=1.6;A.set('.lv2',heartsPill(lives));sfx.bad();if(lives<=0)A.lose(msg,res())}
+  function newHorse(){let from,tx,ty,n=0;do{from=rnd(0,3);tx=rnd(150,W-150);ty=rnd(130,H-120);n++}while(n<40&&Math.hypot(tx-P.x,ty-P.y)<260);const st=[[-60,ty],[W+60,ty],[tx,-60],[tx,H+60]][from];
+    return{x:st[0],y:st[1],tx,ty,sx:st[0],sy:st[1],ph:'in',t:0,vert:Math.random()<.5,face:st[0]<tx?1:-1}}
+  function drawHorse(x,h,t){x.save();x.translate(h.x,h.y+Math.sin(t*4)*4);x.scale(h.face>0?1:-1,1);x.fillStyle='#f59e0b';x.strokeStyle='#b45309';x.lineWidth=3;
+    x.beginPath();x.ellipse(0,0,16,26,0,0,7);x.fill();x.stroke();
+    x.beginPath();x.moveTo(-4,22);x.quadraticCurveTo(-6,46,10,44);x.quadraticCurveTo(20,40,10,32);x.lineWidth=9;x.strokeStyle='#f59e0b';x.stroke();
+    x.beginPath();x.arc(4,-30,13,0,7);x.fillStyle='#fbbf24';x.fill();x.lineWidth=3;x.strokeStyle='#b45309';x.stroke();
+    x.beginPath();x.moveTo(12,-34);x.lineTo(30,-30);x.lineTo(13,-24);x.closePath();x.fillStyle='#fbbf24';x.fill();x.stroke();
+    x.fillStyle='#fff';x.beginPath();x.arc(7,-33,4.5,0,7);x.fill();x.fillStyle='#111';x.beginPath();x.arc(8,-33,2.2,0,7);x.fill();
+    x.fillStyle='#fb923c';for(let k=0;k<4;k++){x.beginPath();x.moveTo(-14,-14+k*9);x.lineTo(-24,-10+k*9);x.lineTo(-14,-6+k*9);x.fill()}x.restore()}
+  function beamRect(h){return h.vert?{x0:h.x-7,x1:h.x+7,y0:h.y-BEAM,y1:h.y+BEAM}:{x0:h.x-BEAM,x1:h.x+BEAM,y0:h.y-7,y1:h.y+7}}
+  function drawBeam(x,h,t){const r=beamRect(h);if(h.ph==='charge'){if(Math.sin(t*20)>0){x.save();x.globalAlpha=.6;x.strokeStyle='#ef4444';x.lineWidth=3;x.setLineDash([10,8]);x.strokeRect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);x.restore()}return}
+    if(h.ph!=='fire')return;x.save();x.shadowColor='#ff2d55';x.shadowBlur=22;x.fillStyle='rgba(255,45,85,.85)';x.fillRect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);x.fillStyle='#fff';
+    if(h.vert)x.fillRect(h.x-2,r.y0,4,r.y1-r.y0);else x.fillRect(r.x0,h.y-2,r.x1-r.x0,4);x.restore()}
   /* الكائنات: صدفة +1 ثابتة تنتظر، نجمة +2 تتحرك، سمكة ذهبية +3 تتحرك وتختفي، سلطعون أحمر -1، سمكة منتفخة برتقالية -2 */
   const KIND={shell:{e:'🐚',v:1,s:38},star:{e:'⭐',v:2,s:42,sp:70},gold:{e:'🐟',v:3,s:44,sp:150,life:6},crab:{e:'🦀',v:-1,s:42,sp:45,life:9,warn:'#ef4444'},puff:{e:'🐡',v:-2,s:44,sp:60,life:9,warn:'#f97316'}};
   const pickKind=()=>{const r=Math.random();return r<.42?'shell':r<.64?'star':r<.74?'gold':r<.88?'crab':'puff'};
@@ -19,10 +35,17 @@ G.sea=(root,c)=>{
     const pop=(X,Y,txt,col)=>pops.push({x:X,y:Y,t:txt,col,a:0});
     items.forEach(it=>{it.a+=dt;if(it.sp){it.x+=it.vx*dt;it.y+=it.vy*dt;if(it.x<50||it.x>W-50)it.vx=-it.vx;if(it.y<70||it.y>H-70)it.vy=-it.vy;it.x=clamp(it.x,50,W-50);it.y=clamp(it.y,70,H-70)}
       if(it.life&&it.a>it.life){it.got=1;return}
-      if(Math.hypot(it.x-P.x,it.y-P.y)<46){it.got=1;pts=Math.max(0,pts+it.v);A.set('.pt',Math.min(pts,goal));if(it.v>0){pop(it.x,it.y,'+'+it.v,'#facc15');fxPt(A,it.x,it.y);sfx.good()}else{pop(it.x,it.y,String(it.v),it.warn);sfx.bad()}}});items=items.filter(it=>!it.got);
+      if(Math.hypot(it.x-P.x,it.y-P.y)<46){it.got=1;if(it.v<0&&pts+it.v<0){pts=0;A.set('.pt',0);pop(it.x,it.y,String(it.v),it.warn);hurt(it.k==='crab'?'لمست السلطعون ونقاطك صفر! 🦀':'لمست السمكة المنتفخة ونقاطك صفر! 🐡');return}pts=Math.max(0,pts+it.v);A.set('.pt',Math.min(pts,goal));if(it.v>0){pop(it.x,it.y,'+'+it.v,'#facc15');fxPt(A,it.x,it.y);sfx.good()}else{pop(it.x,it.y,String(it.v),it.warn);sfx.bad()}}});items=items.filter(it=>!it.got);
     if(pts>=goal)return A.win(pts*10+Math.round(tb.left())*3,'جمعت كل النقاط! ⭐',{...res(),perfect:true});
+    hsT-=dt;if(hsT<=0&&hsCount<HS_MAX&&hs.length<HS_AT){hs.push(newHorse());hsCount++;hsT=rnd(5,9)}
+    hs.forEach(h=>{h.t+=dt;if(h.ph==='in'){const dx=h.tx-h.x,dy=h.ty-h.y,d=Math.hypot(dx,dy),s=Math.min(d,220*dt);if(d<2){h.ph='charge';h.t=0}else{h.x+=dx/d*s;h.y+=dy/d*s}}
+      else if(h.ph==='charge'&&h.t>1){h.ph='fire';h.t=0;beep(1400,.25,'sawtooth',.06)}else if(h.ph==='fire'&&h.t>1.3){h.ph='out';h.t=0}
+      else if(h.ph==='out'){const dx=h.sx-h.x,dy=h.sy-h.y,d=Math.hypot(dx,dy);if(d<4)h.gone=1;else{const s=Math.min(d,260*dt);h.x+=dx/d*s;h.y+=dy/d*s}}
+      if(Math.hypot(h.x-P.x,h.y-P.y)<40)hurt('اصطدمت بحصان البحر!');
+      if(h.ph==='fire'){const r=beamRect(h);if(P.x>r.x0-20&&P.x<r.x1+20&&P.y>r.y0-20&&P.y<r.y1+20)hurt('أصابك ليزر حصان البحر! ⚡')}});
+    hs=hs.filter(h=>!h.gone);if(!A.alive)return;
     sharks.forEach(s=>{items.forEach(it=>{if(!it.got&&it.v>0&&Math.hypot(it.x-s.x,it.y-s.y)<50){it.got=1;pop(it.x,it.y,'🦈 أكلها!','#e2e8f0')}});items=items.filter(it=>!it.got);s.x+=s.v*dt;s.w+=dt;s.y+=Math.sin(s.w*2)*30*dt;if((s.v>0&&s.x>W+100)||(s.v<0&&s.x<-100))Object.assign(s,newShark());
-      if(!inv&&Math.hypot(s.x-P.x,s.y-P.y)<52){lives--;inv=1.6;A.set('.lv2',heartsPill(lives));sfx.bad();if(lives<=0)A.lose('أمسكك القرش! 🦈',res())}});
+      if(Math.hypot(s.x-P.x,s.y-P.y)<52)hurt('أمسكك القرش! 🦈')});
     const g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,'#0ea5e9');g.addColorStop(.55,'#0369a1');g.addColorStop(1,'#0c2d5a');x.fillStyle=g;x.fillRect(0,0,W,H);
     x.save();x.globalAlpha=.12;x.fillStyle='#fff';for(let k=0;k<5;k++){const rx=(k*230+t*20)%(W+200)-100;x.beginPath();x.moveTo(rx,0);x.lineTo(rx+90,0);x.lineTo(rx+240,H);x.lineTo(rx+150,H);x.fill()}x.restore();
     x.fillStyle='#c2a16a';x.beginPath();x.moveTo(0,H);for(let X=0;X<=W;X+=50)x.lineTo(X,H-26-Math.sin(X*.02)*10);x.lineTo(W,H);x.fill();
@@ -33,6 +56,7 @@ G.sea=(root,c)=>{
       x.save();x.translate(it.x,it.y+Math.sin(it.a*3)*4);if(it.vx>0&&it.k!=='star')x.scale(-1,1);emo(x,it.e,0,0,it.s);x.restore();
       x.direction='ltr';x.font='800 16px system-ui,sans-serif';x.textAlign='center';x.lineWidth=4;x.strokeStyle='#fff';const lb=(it.v>0?'+':'')+it.v;x.strokeText(lb,it.x+22,it.y-22);x.fillStyle=bad?it.warn:'#16a34a';x.fillText(lb,it.x+22,it.y-22)});
     sharks.forEach(s=>{x.save();x.translate(s.x,s.y);if(s.v>0)x.scale(-1,1);emo(x,'🦈',0,0,70);x.restore()});
+    hs.forEach(h=>{drawBeam(x,h,t);drawHorse(x,h,t)});
     x.save();x.translate(P.x,P.y);if(face>0)x.scale(-1,1);x.globalAlpha=inv&&Math.sin(t*30)>0?.35:1;emo(x,'🐠',0,0,60);x.restore();
     x.direction='ltr';pops=pops.filter(p=>(p.a+=dt)<1);pops.forEach(p=>{x.globalAlpha=1-p.a;txt(x,p.t,p.x,p.y-p.a*60,30,p.col);x.globalAlpha=1});
     x.direction='inherit';hintTxt(A,x,'اجمع 🐚+1 ⭐+2 🐟+3 قبل القرش · احذر 🦀-1 و🐡-2')});
