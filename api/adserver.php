@@ -143,7 +143,7 @@ function adQuote(array $slots, string $pricing, string $start, string $end, int 
       // التحقق من عدم تداخل حجز حصري آخر في نفس المساحة
       $st = db()->prepare("SELECT name, start, end FROM ad_campaigns WHERE pricing='daily' AND ctype='paid' AND status IN " . AD_HOLD . " AND id<>? AND (','||slots||',') LIKE ? AND start<=? AND end>=?");
       $st->execute([$exceptId, '%,' . $s . ',%', $end, $start]);
-      if ($bk = $st->fetch()) fail('المساحة «' . AD_SLOTS[$s]['t'] . '» محجوزة حصرياً من ' . $bk['start'] . ' إلى ' . $bk['end'] . '. اختر تواريخ أخرى أو باقة مرات الظهور');
+      if ($bk = $st->fetch()) fail('المساحة «' . AD_SLOTS[$s]['t'] . '» محجوزة حصرياً من ' . $bk['start'] . ' إلى ' . $bk['end'] . '. اختر أياماً أخرى غير المحجوزة');
       $cost = $days * $P[$s]['daily'];
       $lines[] = ['slot' => $s, 't' => AD_SLOTS[$s]['t'], 'qty' => $days, 'unit' => $P[$s]['daily'], 'desc' => "$days يوم × " . $P[$s]['daily'], 'cost' => round($cost, 2), 'est' => $avg[$s] * $days];
     } else {
