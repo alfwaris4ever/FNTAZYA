@@ -84,7 +84,7 @@ jobs:
       - name: ختم نسخة لملفات JS وCSS حتى لا يعرض المتصفح نسخة قديمة مخزّنة (الخادم يخزّنها 7 أيام)
         run: |
           V=${GITHUB_SHA::7}
-          for f in *.html; do sed -i -E "s#((src|href)=\"(js|css)/[^\"?]+\.(js|css))\"#\1?v=$V\"#g" "$f"; done
+          for f in *.html; do sed -i -E "s#((src|href)=\"(js|css)/[^\"?]+\.(js|css))(\?v=[^\"]*)?\"#\1?v=$V\"#g" "$f"; done
           grep -c "?v=$V" index.html
       - name: رفع ملفات الموقع إلى Hostinger عبر FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -127,7 +127,7 @@ jobs:
       - name: ختم نسخة لملفات JS وCSS حتى لا يعرض المتصفح نسخة قديمة مخزّنة (الخادم يخزّنها 7 أيام)
         run: |
           V=${GITHUB_SHA::7}
-          for f in *.html; do sed -i -E "s#((src|href)=\"(js|css)/[^\"?]+\.(js|css))\"#\1?v=$V\"#g" "$f"; done
+          for f in *.html; do sed -i -E "s#((src|href)=\"(js|css)/[^\"?]+\.(js|css))(\?v=[^\"]*)?\"#\1?v=$V\"#g" "$f"; done
           grep -c "?v=$V" index.html
       - name: مطابقة ملفات الموقع (html/css/js) على الخادم مع النسخة المنشورة
         run: |
