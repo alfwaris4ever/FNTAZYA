@@ -70,7 +70,7 @@ function sendMail(string $email, string $subject, string $title, string $bodyHtm
    . '<tr><td align="center" style="background:linear-gradient(135deg,#5b3cff,#ec4899);background-color:#6d3cf0;padding:28px 20px">'
    . '<img src="' . SITE_URL . '/icon-192.png" width="84" height="84" alt="فنتازيا" style="display:block;border-radius:20px;border:0">'
    . '<div style="color:#ffffff;font-size:28px;font-weight:bold;margin-top:10px">فنتازيا</div>'
-   . '<div style="color:#fde68a;font-size:14px;margin-top:2px">وقت اللعب الصح · fntazya.com</div></td></tr>'
+   . '<div style="color:#fde68a;font-size:14px;margin-top:2px">لعبة ومعلومة · fntazya.com</div></td></tr>'
    . '<tr><td dir="rtl" style="padding:28px 26px 10px;text-align:right">'
    . '<h1 style="margin:0 0 12px;font-size:22px;color:#1d2350">' . h($title) . '</h1>' . $bodyHtml . '</td></tr>'
    . '<tr><td align="center" style="padding:8px 26px 26px"><a href="' . SITE_URL . '" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;font-weight:bold;font-size:18px;padding:12px 34px;border-radius:99px">▶ العب الآن</a></td></tr>'
