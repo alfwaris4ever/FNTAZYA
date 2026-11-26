@@ -20,7 +20,7 @@ function planeQuiz(TASKS,opt={}){return(root,c)=>{
     <div class="hud">${c.tag}<span class="pill">✅ <b class="sc">0</b> من ${goal}</span><span class="pill lv2">${heartsPill(lives)}</span></div>
     <style>#stage .pl-hud-fix .pill{background:rgba(29,35,80,.78)!important;color:#fff!important}</style>
     <div class="pl-task" style="position:absolute;top:calc(var(--hud,58px) + 4px);left:50%;translate:-50% 0;z-index:4;background:#fff;color:#1d2350;border-radius:18px;padding:8px 16px;font-weight:800;font-size:clamp(15px,4.2cqmin,24px);box-shadow:0 5px 0 rgba(29,35,80,.15);text-align:center;max-width:94%;pointer-events:none" hidden>🎯 ${task.q}</div>
-    <div class="overlay pl-intro" style="z-index:6"><div class="ov-card" style="max-width:min(92%,560px)"><div class="ov-emo">✈️</div><h2 style="font-size:clamp(22px,6.5cqmin,40px);line-height:1.45;margin:6px 0 14px">${task.q}</h2><p>⬆️⬇️ وجّه الطائرة نحو السحب الصحيحة وتجنّب الخاطئة</p><p>✅ المطلوب ${goal} ${task.group?'مجموعات':'إجابات'} صحيحة · ${'❤️'.repeat(lives)} لكل خطأ قلب</p><div class="ov-btns"><button class="play-btn pl-go">▶ ابدأ</button></div></div></div>`;
+    <div class="overlay pl-intro" style="z-index:6"><div class="ov-card" style="max-width:min(92%,560px)"><div class="ov-emo">✈️</div><h2 style="font-size:clamp(22px,6.5cqmin,40px);line-height:1.45;margin:6px 0 14px">${task.q}</h2><p>⬆️⬇️⬅️➡️ وجّه الطائرة نحو السحب الصحيحة وتجنّب الخاطئة</p><p>✅ المطلوب ${goal} ${task.group?'مجموعات':'إجابات'} صحيحة · ${'❤️'.repeat(lives)} لكل خطأ قلب</p><div class="ov-btns"><button class="play-btn pl-go">▶ ابدأ</button></div></div></div>`;
   root.querySelector('.hud').classList.add('pl-hud-fix');
   const cv=root.querySelector('.pl-cv'),x=cv.getContext('2d'),sc=root.querySelector('.sc'),intro=root.querySelector('.pl-intro'),$task=root.querySelector('.pl-task');
   setTimeout(()=>speak(task.q.replace(/[^\u0600-\u06FF0-9 ،()+×÷−_-]/g,'')),300);
@@ -28,12 +28,12 @@ function planeQuiz(TASKS,opt={}){return(root,c)=>{
   const size=()=>{const r=root.getBoundingClientRect();W=r.width;H=r.height;dpr=Math.min(2,devicePixelRatio||1);cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);const rr=root.getBoundingClientRect(),tb2=(started?$task:root.querySelector('.hud')).getBoundingClientRect();top=tb2.bottom-rr.top+10;bot=H*.86};
   size();c.on(window,'resize',size);
   const res=()=>({got:Math.min(score,goal),total:goal,label:'إجابات صحيحة'});
-  /* الطائرة: تتحرك للأعلى والأسفل بالأسهم أو W/S، أو بالسحب/اللمس على الشاشة */
-  let py=.5,ty=.5,vy=0,inv=0,shake=0,keyU=false,keyD=false;
+  /* الطائرة: تتحرك للأعلى والأسفل وللأمام والخلف بالأسهم أو W/S/A/D، أو بالسحب/اللمس على الشاشة */
+  let py=.5,ty=.5,vy=0,pxv=.15,txv=.15,keyL=false,keyR=false,inv=0,shake=0,keyU=false,keyD=false;
   c.on(window,'keydown',e=>{if(!started&&(e.key==='Enter'||e.key===' ')){e.preventDefault();e.stopPropagation();start();return}
-    if(['ArrowUp','w','W'].includes(e.key)){keyU=true;e.preventDefault()}else if(['ArrowDown','s','S'].includes(e.key)){keyD=true;e.preventDefault()}});
-  c.on(window,'keyup',e=>{if(['ArrowUp','w','W'].includes(e.key))keyU=false;else if(['ArrowDown','s','S'].includes(e.key))keyD=false});
-  let drag=false;const toY=e=>{const r=cv.getBoundingClientRect();ty=Math.max(0,Math.min(1,(e.clientY-r.top-top)/Math.max(1,bot-top)))};
+    if(['ArrowUp','w','W'].includes(e.key)){keyU=true;e.preventDefault()}else if(['ArrowDown','s','S'].includes(e.key)){keyD=true;e.preventDefault()}else if(['ArrowRight','d','D'].includes(e.key)){keyR=true;e.preventDefault()}else if(['ArrowLeft','a','A'].includes(e.key)){keyL=true;e.preventDefault()}});
+  c.on(window,'keyup',e=>{if(['ArrowUp','w','W'].includes(e.key))keyU=false;else if(['ArrowDown','s','S'].includes(e.key))keyD=false;else if(['ArrowRight','d','D'].includes(e.key))keyR=false;else if(['ArrowLeft','a','A'].includes(e.key))keyL=false});
+  let drag=false;const toY=e=>{const r=cv.getBoundingClientRect();ty=Math.max(0,Math.min(1,(e.clientY-r.top-top)/Math.max(1,bot-top)));txv=Math.max(0,Math.min(1,(e.clientX-r.left-W*.08)/(W*.62)))};
   c.on(cv,'pointerdown',e=>{drag=true;toY(e)});c.on(cv,'pointermove',e=>{if(drag||e.pointerType==='mouse')toY(e)});c.on(window,'pointerup',()=>drag=false);
   /* السحب: كل سحابة تحمل إجابة (رقم، عملية، حرف، كلمة، صورة) أو مجموعة */
   const clouds=[],fx=[];let lastLanes=[],spawnT=0;
@@ -93,12 +93,12 @@ function planeQuiz(TASKS,opt={}){return(root,c)=>{
   let last=null;const t00=performance.now();
   (function loop(){if(!cv.isConnected){au?.stop();return}requestAnimationFrame(loop);const now=performance.now(),t=(now-t00)/1000;if(c.paused){last=null;au?.set(false,0);return}const dt=Math.min(.05,(now-(last||now))/1000);last=now;
     const sp=Math.max(W/5.2,130);scroll+=sp*dt;
-    if(started&&!over){au?.set(sound.on&&!document.hidden,-vy);if(keyU)ty=Math.max(0,ty-dt*1.3);if(keyD)ty=Math.min(1,ty+dt*1.3);
+    if(started&&!over){au?.set(sound.on&&!document.hidden,-vy);if(keyU)ty=Math.max(0,ty-dt*1.3);if(keyD)ty=Math.min(1,ty+dt*1.3);if(keyR)txv=Math.min(1,txv+dt*.9);if(keyL)txv=Math.max(0,txv-dt*.9);pxv+=(txv-pxv)*Math.min(1,dt*6);
       const npy=py+(ty-py)*Math.min(1,dt*7);vy=(npy-py)/Math.max(dt,.001);py=npy;
       spawnT-=dt;if(spawnT<=0){if(task.group){spawnGroups();spawnT=Math.max(2.6,(cloudH()*3.4+60)/sp)}else{spawnOne();spawnT=Math.max(1.15,(cloudH()*2.2+30)/sp)}}}
     inv=Math.max(0,inv-dt);shake=Math.max(0,shake-dt);
     x.setTransform(dpr,0,0,dpr,0,0);drawBg(t);
-    const PX=W*.18,PY=top+py*(bot-top),ps=Math.max(.5,Math.min(1.25,(bot-top)/360,W/560));
+    const PX=W*(.08+pxv*.62),PY=top+py*(bot-top),ps=Math.max(.5,Math.min(1.25,(bot-top)/360,W/560));
     for(const cl of clouds){if(!cl.dead||cl.pop)cl.x-=sp*dt*(cl.dead?.3:1);const[w,h]=cloudSize(cl),Y=top+cl.y*(bot-top)+Math.sin(t*1.5+cl.wob)*4;
       if(!cl.dead&&started&&!over&&Math.abs(cl.x-PX)<w*.42+40*ps&&Math.abs(Y-PY)<h*.3+14*ps)hitCloud(cl,cl.x,Y);
       if(cl.dead){cl.pop+=dt*2.2;cl.a=Math.max(0,1-cl.pop)}
