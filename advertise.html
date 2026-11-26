@@ -112,7 +112,6 @@ footer{text-align:center;color:#64748b;font-weight:600;padding:10px 16px 30px}
     </form>
   </section>
 </main>
-<footer>© فنتازيا 2026 · <a href="./">العودة للألعاب</a></footer>
 <script>
 {const sc=document.getElementById('scta'),hc=document.getElementById('heroCta');let was=null;const chk=()=>{const on=hc.getBoundingClientRect().bottom<0;if(on===was)return;was=on;sc.classList.toggle('on',on);sc.setAttribute('aria-hidden',!on);sc.querySelectorAll('a').forEach(a=>a.tabIndex=on?0:-1)};addEventListener('scroll',chk,{passive:true});addEventListener('resize',chk);chk()}
 document.querySelectorAll('a[href="#prices"]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();const t=document.getElementById('prices');scrollTo({top:t.getBoundingClientRect().top+scrollY-80,behavior:'smooth'})}));
@@ -128,5 +127,6 @@ f.onsubmit=async e=>{e.preventDefault();m.className='';const d=Object.fromEntrie
   catch(er){m.className='err';m.textContent=er.message||'تعذّر الإرسال، جرّب بعد قليل'}b.disabled=false};
 </script>
 <script src="js/totop.js"></script>
+<script src="js/footer.js?v=1"></script>
 </body>
 </html>
