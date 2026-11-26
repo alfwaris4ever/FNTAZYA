@@ -6,7 +6,8 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 
-const ADMIN_EMAILS = ['alfwaris4ever@gmail.com'];
+const ADMIN_EMAILS = ['alfwaris4ever@gmail.com']; // حساب دخول لوحة الإدارة فقط
+const CONTACT_EMAIL = 'info@fntazya.com'; // بريد الموقع الرسمي: التواصل والإشعارات والفواتير والرد على الرسائل
 const MAX_FAILS_EMAIL = 6;   // محاولات خاطئة لكل بريد خلال 15 دقيقة
 const MAX_FAILS_IP = 30;     // محاولات خاطئة لكل IP خلال 15 دقيقة
 
@@ -82,7 +83,7 @@ function sendMail(string $email, string $subject, string $title, string $bodyHtm
   $text = $bodyText . "\n\n" . SITE_URL . "\n\n---\nلإيقاف الرسائل من موقع فنتازيا انقر على الرابط أدناه\n" . $u . "\n";
   $b = 'fz' . bin2hex(random_bytes(8));
   $headers = "From: =?UTF-8?B?" . base64_encode('فنتازيا') . "?= <no-reply@fntazya.com>\r\n"
-    . "Reply-To: no-reply@fntazya.com\r\nMIME-Version: 1.0\r\n"
+    . "Reply-To: " . CONTACT_EMAIL . "\r\nMIME-Version: 1.0\r\n"
     . "List-Unsubscribe: <" . $u . ">\r\n"
     . "Content-Type: multipart/alternative; boundary=\"$b\"\r\n";
   $msg = "--$b\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($text))
@@ -358,7 +359,7 @@ SQL)]);
           . '<tr><td><b>الاسم</b></td><td>' . h($name) . '</td></tr><tr><td><b>الشركة</b></td><td>' . h($company) . '</td></tr>'
           . '<tr><td><b>البريد</b></td><td dir="ltr">' . h($email) . '</td></tr><tr><td><b>الجوال</b></td><td dir="ltr">' . h($phone) . '</td></tr>'
           . '<tr><td><b>الباقة</b></td><td>' . h($pkg) . '</td></tr><tr><td valign="top"><b>التفاصيل</b></td><td>' . nl2br(h($msg)) . '</td></tr></table>';
-        foreach (ADMIN_EMAILS as $to) sendMail($to, 'طلب إعلان جديد: ' . $company, 'طلب إعلان جديد 📢', $rows, "طلب إعلان من $name ($company) - $email - $phone\n$pkg\n$msg");
+        foreach ([CONTACT_EMAIL] as $to) sendMail($to, 'طلب إعلان جديد: ' . $company, 'طلب إعلان جديد 📢', $rows, "طلب إعلان من $name ($company) - $email - $phone\n$pkg\n$msg");
       } catch (Throwable $e) { error_log('advertise mail: ' . $e->getMessage()); }
       out(['ok' => true]);
     }

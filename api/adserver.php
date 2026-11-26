@@ -416,7 +416,7 @@ switch ($a) {
     $S = adSettings(); $q = json_decode((string)$c['quote'], true) ?: ['lines' => [['t' => $c['name'], 'desc' => '', 'cost' => (float)$c['price']]], 'subtotal' => (float)$c['price'], 'vat' => 0, 'vatRate' => 0, 'total' => (float)$c['price']];
     out(['ok' => true, 'invoice' => ['no' => $c['invoice_no'], 'date' => $c['invoice_date'], 'due' => gmdate('Y-m-d', strtotime($c['invoice_date'] . ' UTC') + (int)$S['invoice_days'] * 86400),
       'paid' => (int)$c['paid_at'] > 0, 'paid_date' => (int)$c['paid_at'] ? gmdate('Y-m-d', (int)$c['paid_at'] + 3 * 3600) : '', 'status' => $c['status']],
-      'seller' => ['name' => $S['seller_name'], 'cr' => $S['seller_cr'], 'vat' => $S['seller_vat'], 'address' => $S['seller_address'], 'email' => ADMIN_EMAILS[0]],
+      'seller' => ['name' => $S['seller_name'], 'cr' => $S['seller_cr'], 'vat' => $S['seller_vat'], 'address' => $S['seller_address'], 'email' => CONTACT_EMAIL],
       'buyer' => ['company' => $c['adv_company'] ?: $c['advertiser'], 'name' => $c['adv_name'], 'email' => $c['adv_email'], 'phone' => $c['adv_phone']],
       'campaign' => ['name' => $c['name'], 'pricing' => $c['pricing'], 'start' => $c['start'], 'end' => $c['end'], 'impr' => (int)$c['max_impr']],
       'quote' => $q, 'currency' => $S['currency'], 'pay_info' => $S['pay_info']]);
@@ -508,7 +508,7 @@ switch ($a) {
       $rows = '<p style="font-size:15px;line-height:1.9">الحملة: <b>' . h($name) . '</b><br>المعلن: ' . h($u['company']) . ' (' . h($u['email']) . ' · ' . h($u['phone']) . ')<br>'
         . ($q['pricing'] === 'daily' ? 'حجز حصري من ' . $q['start'] . ' إلى ' . $q['end'] : number_format($q['impr']) . ' مرة ظهور') . '<br>القيمة: <b>' . money($q['total'], $S) . '</b></p>'
         . '<p><a href="https://fntazya.com/admin.html#ads" style="background:#5b3cff;color:#fff;padding:10px 20px;border-radius:99px;text-decoration:none;font-weight:bold">مراجعة الحملة</a></p>';
-      foreach (ADMIN_EMAILS as $to) sendMail($to, 'حملة إعلانية جديدة بانتظار الموافقة: ' . $u['company'], 'حملة جديدة بانتظار الموافقة 📢', $rows, "حملة جديدة من {$u['company']}: $name - " . money($q['total'], $S));
+      foreach ([CONTACT_EMAIL] as $to) sendMail($to, 'حملة إعلانية جديدة بانتظار الموافقة: ' . $u['company'], 'حملة جديدة بانتظار الموافقة 📢', $rows, "حملة جديدة من {$u['company']}: $name - " . money($q['total'], $S));
       $link = 'https://fntazya.com/advertiser.html#c=' . $id;
       sendMail($u['email'], ($again ? 'استلمنا تعديل حملتك: ' : 'شكراً لثقتك بفنتازيا: ') . $name, $again ? 'استلمنا حملتك المعدّلة ✅' : 'شكراً لك شريك النجاح 🤝',
         '<p style="font-size:15px;line-height:1.9">مرحباً ' . h($u['name']) . '،<br>' . ($again ? 'استلمنا حملتك بعد التعديل، وعادت إلى المراجعة.' : 'شكراً لاختيارك فنتازيا شريكاً لنجاح علامتك. استلمنا طلب حملتك وهو الآن قيد المراجعة.') . '</p>'
