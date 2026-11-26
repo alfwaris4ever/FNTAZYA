@@ -12,7 +12,7 @@
   const here = location.pathname.split('/').pop() || 'index.html';
   const st = document.createElement('style');
   st.textContent = `
-#fzFoot{position:relative;margin-top:70px;color:#1d2350;font-family:inherit;isolation:isolate;clear:both}
+#fzFoot{padding:0!important;margin-inline:0!important;text-align:start;font-weight:400;font-size:16px;background:none;position:relative;margin-top:70px;color:#1d2350;font-family:inherit;isolation:isolate;clear:both}
 #fzFoot .ff-edge{position:absolute;left:0;right:0;top:-58px;height:60px;overflow:hidden;pointer-events:none}
 #fzFoot .ff-edge svg{position:absolute;bottom:0;left:0;width:200%;height:100%;animation:ffWave 14s linear infinite}
 #fzFoot .ff-edge svg.b{opacity:.55;animation-duration:22s;animation-direction:reverse;bottom:6px}
