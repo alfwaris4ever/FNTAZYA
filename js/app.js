@@ -254,7 +254,7 @@ function stageDone(g,run,score,msg,res){const{diff,stage}=run,D=DIFFS[diff],perf
       tmr=setInterval(()=>{if(!ov.isConnected)return clearInterval(tmr);n--;const cd=ov.querySelector('.cd');if(cd)cd.textContent=`(${n})`;if(n<=0)go()},1000);
       const stop=()=>{clearInterval(tmr);const cd=ov.querySelector('.cd');if(cd)cd.textContent=''};ov.querySelector('[data-act=map]').addEventListener('pointermove',stop);
       const ak=e=>{if(!ov.isConnected)return document.removeEventListener('keydown',ak);if(e.key.startsWith('Arrow'))stop()};document.addEventListener('keydown',ak);return ov}
-    return overlayCard(`<div class="ov-emo">👑</div>${starsHTML(3)}<h2>${cheer('top')}</h2><div class="sub-h">👑 أنهيت كل المستويات! أنت بطل «${g.t}»</div>${resultHTML(res,'ok')}<p>${msg}<br>أكملت المستويات الثلاثة بكل مراحلها الثلاثين 🎉</p><div class="ov-btns"><button class="play-btn" data-act="map">🗺️ المراحل</button><button class="play-btn" data-act="again">🔁 العب الصعب من جديد</button></div>`,
+    return overlayCard(`<div class="ov-emo">👑</div>${starsHTML(3)}<h2>${cheer('top')}</h2><div class="sub-h">👑 أنهيت كل مستويات «${g.t}»! ${heroTitle()}</div>${resultHTML(res,'ok')}<p>${msg}<br>أكملت المستويات الثلاثة بكل مراحلها الثلاثين 🎉</p><div class="ov-btns"><button class="play-btn" data-act="map">🗺️ المراحل</button><button class="play-btn" data-act="again">🔁 العب الصعب من جديد</button></div>`,
       {map:()=>showStart(g),again:()=>startGame(g,diff,1)})}
   if(perfect)
     return overlayCard(`<div class="ov-emo">🤩</div>${starsHTML(3)}<h2>${cheer('top')}</h2><div class="sub-h">✅ علامة كاملة · أنهيت المرحلة ${stage}</div>${resultHTML(res,'ok')}<p>${msg}${unlockedNow?`<br>🔓 فُتحت المرحلة ${stage+1}`:''}</p><div class="ov-btns"><button class="play-btn" data-act="next">▶ المرحلة ${stage+1}</button><button class="play-btn" data-act="retry">🔁 أعد المرحلة ${stage}</button><button class="play-btn" data-act="map">🗺️ المراحل</button></div>`,
@@ -292,13 +292,33 @@ function fountain(){const st=$('#stage');st.querySelector('.fx')?.remove();const
       if(p.e){x.font=`${p.s*2}px serif`;x.textAlign='center';x.textBaseline='middle';x.fillText(p.e,0,0)}
       else{x.fillStyle=p.c;if(p.sh===0)x.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);else{x.beginPath();if(p.sh===1)x.arc(0,0,p.s/2.4,0,7);else{x.moveTo(0,-p.s/2);x.lineTo(p.s/2,p.s/2);x.lineTo(-p.s/2,p.s/2)}x.fill()}}}
     if(t-t0<DUR&&alive&&cv.isConnected)requestAnimationFrame(loop);else cv.remove()})(t0)}
-/* عبارات تحفيزية باللهجة البيضاء */
+/* عبارات تحفيزية باللهجة البيضاء، باسم الطفل وحسب كونه ولداً أو بنتاً.
+   إذا لم نعرف الاسم أو لم نعرف هل هو ولد أو بنت نستخدم عبارات تصلح للاثنين فقط */
 const CHEERS={
-  top:['أبدااااع! 🤩','يا سلااام عليك! 👏','كفو والله! 💪','وحش! ما شاء الله 🔥','أسطورة! 🌟','ذيب! ما يوقفك شي 🐺','رهيييب! 🎉','فنّان! كمّل كذا 🏆','بطل! ولا غلطة 😎'],
-  near:['باقي شوي! جرّب مرة ثانية 💪','قرّبت مرة! حاول كمان 🔥','ما بقى إلا القليل! 👌','شوية تركيز وتجيبها كاملة! 🎯','كنت قريب! يلا مرة ثانية 🚀'],
-  low:['ولا يهمك، جرّب مرة ثانية 😊','عادي، كلنا نتعلّم! يلا كمان مرة 💪','المرة الجاية أحلى! 🌈','لا تستسلم، تقدر عليها! ⭐']};
-function cheer(kind){const s=CHEERS[kind][rnd(0,CHEERS[kind].length-1)];
+  top:{n:['أبدااااع يا {n}! 🤩','كفو يا {n}! 💪','رهيييب يا {n}! 🎉','ما شاء الله يا {n}! 🌟','تبارك الله يا {n}! 🏆','ولا غلطة يا {n}! 😎','إبداع يا {n}! ✨'],
+    m:['وحش يا {n}! 🔥','ذيب يا {n}! ما يوقفك شي 🐺','بطل يا {n}! 🏆','فنّان يا {n}! كمّل كذا 🎨','أنت أسطورة يا {n}! 🌟'],
+    f:['بطلة يا {n}! 🏆','فنّانة يا {n}! كمّلي كذا 🎨','أنتِ رهيبة يا {n}! 🎉','شاطرة يا {n}! 🌟','مبدعة يا {n}! 💖','أنتِ أسطورة يا {n}! 👑']},
+  near:{n:['باقي شوي يا {n}! 💪','ما بقى إلا القليل يا {n}! 👌','يلا مرة ثانية يا {n}! 🚀','النتيجة قريبة مرة يا {n}! 🎯'],
+    m:['قرّبت مرة يا {n}! حاول كمان 🔥','كنت قريب يا {n}! جرّب مرة ثانية 🚀','شوية تركيز وتجيبها كاملة يا {n}! 🎯'],
+    f:['قرّبتِ مرة يا {n}! حاولي كمان 🔥','كنتِ قريبة يا {n}! جرّبي مرة ثانية 🚀','شوية تركيز وتجيبينها كاملة يا {n}! 🎯']},
+  low:{n:['المرة الجاية أحلى يا {n}! 🌈','عادي يا {n}، كلنا نتعلّم! يلا كمان مرة 💪','ولا يهمك يا {n}! يلا من جديد 😊'],
+    m:['لا تستسلم يا {n}، تقدر عليها! ⭐','جرّب مرة ثانية يا {n} 😊'],
+    f:['لا تستسلمين يا {n}، تقدرين عليها! ⭐','جرّبي مرة ثانية يا {n} 😊']}};
+/* معرفة الولد والبنت من الاسم: قوائم أسماء شائعة، ثم قواعد بسيطة (ة أو اء في آخر الاسم = بنت مع استثناءات) */
+const nmNorm=s=>String(s||'').replace(/[\u064B-\u0652\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/\s+/g,'').trim();
+const NAMES_M=new Set('محمد احمد خالد عبدالله فهد سعود فيصل سلطان تركي ناصر سعد علي عمر عثمان يوسف ابراهيم حمد حمود بندر نايف ماجد مشاري متعب مساعد سلمان عبدالعزيز عبدالرحمن عبدالملك عبدالاله عبدالمجيد عبدالكريم زياد ريان راكان رائد راشد وليد يزيد بدر طلال مازن هشام حسن حسين ياسر سامي سالم صالح طارق عادل عمار فارس قصي ليث مالك مهند نواف هاني هادي هيثم وائل يحيي موسي عيسي مصطفي مرتضي زكريا حمزه حمزة اسامه اسامة معاذ معاويه معاوية عبيده عبيدة طلحه طلحة سيف انس اياد ادم نوح جاسم جابر جمال حامد خليل رامي رياض زيد سامر شادي صقر ضاري عزام غازي غانم فراس فواز كريم لؤي ماهر مجد مراد مشعل منصور مهدي نبيل نزار هزاع يامن تميم ثامر حاتم دانيال رعد عساف غيث مؤيد علاء بهاء ضياء عبدالرحيم عبدالاله تميم عمرو بسام باسل باسم ايهاب امير عامر عبدالمحسن مشعل نايف ذياب عزوز عبود حمودي سعيد مشاري قاسم كمال مالك مروان مصعب مهيب نادر نجم هتان هود وسيم ياسين'.split(' '));
+const NAMES_F=new Set('فاطمه فاطمة نوره نورة ساره سارة مريم منال هند لمي ريم رهف جني جنا جوري لين ليان لانا رنا رند غلا غاده غادة شهد دانه دانة رغد لجين لولوه لولوة ريما رزان روان العنود عنود اسماء هيفاء لمياء ندي مني سلمي ليلي هيا حلا شوق وعد بشاير بشري عبير امل نوف اروي خلود ديما دينا رشا سماح سلوي عائشه عائشة عايشه خديجه خديجة زينب حصه حصة نجلاء ياسمين تالا تولين سدن ميار ميرال لارا جمانه جمانة جيهان رحاب هبه هبة هيام وجدان يارا جوانا لولو مها نهي نجود البندري بندري الجوهره الجوهرة جواهر الهنوف هنوف حور حوراء سجي ملاك رتاج روي رؤي الين ايلين ماريا تسنيم ايه اية ايمان منيره منيرة لطيفه لطيفة شيخه شيخة موضي مزنه مزنة اثير غدير ساره رنيم تاليا ماسه ماسة الماس دلال وفاء صفاء رهام شروق غيداء نغم لمار ريتال جوان سلاف'.split(' '));
+function kidInfo(){let n='';try{n=(JSON.parse(localStorage.getItem('fz:user')||'null')?.name||'').trim()}catch(e){}
+  if(!n||!localStorage.getItem('fz:token'))return{name:'',g:''};
+  let first=n.split(/\s+/)[0];if(/^عبد$/.test(first)&&n.split(/\s+/)[1])first=n.split(/\s+/).slice(0,2).join(' '); // عبد الرحمن
+  const k=nmNorm(first);let g='';
+  if(NAMES_M.has(k)||/^عبد/.test(k)||/^ابو/.test(k))g='m';else if(NAMES_F.has(k)||/^ام/.test(k)&&k.length>3)g='f';
+  else if(/[ةه]$/.test(first)&&/ة$/.test(first))g='f';else if(/اء$/.test(k))g='f';
+  return{name:first.length<=20?first:'',g}}
+function cheer(kind){const K=kidInfo(),C=CHEERS[kind],pool=[...C.n,...(K.g?C[K.g]:[])];
+  let s=pool[rnd(0,pool.length-1)];s=K.name?s.replace('{n}',K.name):s.replace(/ يا \{n\}/,'');
   setTimeout(()=>speak(s.replace(/[^\u0600-\u06FF\s!،]/g,'').replace(/(.)\1{2,}/g,'$1$1')),kind==='top'?900:300);return s}
+function heroTitle(){const K=kidInfo();return K.g==='m'?`أنت بطل${K.name?' يا '+K.name:''}`:K.g==='f'?`أنتِ بطلة${K.name?' يا '+K.name:''}`:`إنجاز عظيم${K.name?' يا '+K.name:''}`}
 function celebrate(){fountainSound();fountain()}
 function updateFav(){const on=curGame&&favs.has(curGame.id);$('#favBtn').textContent=on?'❤️':'🤍';$('#favBtn').classList.toggle('on',on)}
 function updateSound(){$('#soundBtn').textContent=sound.on?'🔊':'🔇'}
