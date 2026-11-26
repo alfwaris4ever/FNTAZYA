@@ -58,7 +58,15 @@ function accNudge(){if(ACC.token||$('.acc-ov')||!ACC.online)return;const last=st
   const ov=accModal(`<div class="acc-hero">⭐</div><h2>أحسنت! تقدّمك رائع</h2><p>اعمل حساباً <b>مجانياً</b> في 10 ثوانٍ لتحفظ مراحلك وتكمل من أي جهاز، وتحصل على ألعاب مقترحة تناسبك.</p>
     <div class="acc-perks"><span>💾 حفظ المراحل</span><span>📱 العب من أي جهاز</span><span>✨ ألعاب تناسبك</span></div>
     <div class="acc-btns"><button class="play-btn" data-go>👤 اعمل حسابي</button><button class="play-btn alt" data-later>لاحقاً</button></div><small class="acc-note">الحساب اختياري، واللعب بدون حساب متاح دائماً.</small>`);
-  ov.querySelector('[data-go]').onclick=()=>openAuth();ov.querySelector('[data-later]').onclick=()=>ov.remove()}
+  ov.querySelector('[data-go]').onclick=()=>openAuth();ov.querySelector('[data-later]').onclick=()=>ov.remove();centerOnStage(ov)}
+/* على الكمبيوتر: نضع النافذة في منتصف شاشة اللعبة (طولاً وعرضاً) بدل منتصف الصفحة */
+function centerOnStage(ov){const st=$('#stage'),vg=$('#view-game');if(!st||!vg||vg.hidden)return;
+  const fit=()=>{if(!ov.isConnected)return removeEventListener('resize',fit);
+    if(innerWidth<1024){ov.style.padding='';return}
+    const r=st.getBoundingClientRect(),t=Math.max(14,r.top),b=Math.max(14,innerHeight-Math.min(innerHeight,r.bottom)),l=Math.max(14,r.left),rt=Math.max(14,innerWidth-r.right);
+    if(innerHeight-t-b<ov.querySelector('.acc-card').offsetHeight+10){ov.style.padding='';return} // شاشة اللعبة أقصر من النافذة: نعود لمنتصف الصفحة
+    ov.style.padding=`${t}px ${rt}px ${b}px ${l}px`};
+  fit();addEventListener('resize',fit)}
 
 function openAuth(mode='new'){if(!ACC.online)return toast('الحساب يعمل على الموقع fntazya.com');let av=AVATARS[0];
   const ov=accModal(`<div class="acc-tabs"><button data-m="new">✨ حساب جديد</button><button data-m="in">🔑 عندي حساب</button></div><form class="acc-form" novalidate>
