@@ -21,11 +21,15 @@ main{max-width:900px;margin:-40px auto 0;padding:0 16px}
 ul{margin:6px 0;padding-inline-start:22px}li{margin:4px 0}a{color:#5b3cff;font-weight:700}
 table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:9px 8px;border-bottom:1px solid #eef1ff;text-align:right;vertical-align:top}th{background:#f8fafc;color:#475569}
 .note{color:#64748b;font-size:14px}
+.sbar{position:fixed;top:0;left:0;right:0;z-index:200;background:linear-gradient(135deg,#0ea5e9,#5b3cff);box-shadow:0 6px 20px rgba(29,35,80,.25);transform:translateY(-110%);transition:transform .25s}.sbar.on{transform:none}
+.sbar-in{max-width:900px;margin:0 auto;padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:#fff}.sbar .brand{font-size:20px}.sbar .brand img{width:36px;height:36px;border-radius:10px}.sbar-t{font-size:17px}
+@media(max-width:560px){.sbar .brand{font-size:0;gap:0}.sbar-t{font-size:15px}.sbar .back{font-size:13px;padding:5px 12px}}
 </style>
 </head>
 <body>
 <header class="hero"><div class="top"><a class="brand" href="./"><img src="icon-192.png" alt="">فنتازيا</a><a class="back" href="./">↩ العودة للألعاب</a></div>
 <h1>مركز الخصوصية 🛡️</h1><p>خصوصية طفلك أولاً، وبأقل قدر ممكن من البيانات</p></header>
+<div class="sbar" id="sbar" aria-hidden="true"><div class="sbar-in"><a class="brand" href="./" tabindex="-1"><img src="icon-192.png" alt="">فنتازيا</a><b class="sbar-t">مركز الخصوصية 🛡️</b><a class="back" href="./" tabindex="-1">↩ العودة للألعاب</a></div></div>
 <main>
 <section class="card"><h2>باختصار</h2><div class="sum">
 <div><b>🚫</b>لا نبيع بيانات أي شخص ولا نشاركها للتسويق</div>
@@ -61,6 +65,7 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:9px 8px;b
 <section class="card"><h2>حماية البيانات</h2><p style="margin:0">يعمل الموقع عبر اتصال مشفّر (HTTPS)، والرموز وكلمات المرور محفوظة مشفّرة ولا يمكن لأحد قراءتها، وقاعدة البيانات محفوظة خارج المجلد العام للموقع. قد نحدّث هذه الصفحة عند إضافة ميزات جديدة، ونذكر تاريخ آخر تحديث أدناه.</p>
 <p class="note" style="margin:10px 0 0">آخر تحديث: نوفمبر 2026</p></section>
 </main>
+<script>{const sb=document.getElementById('sbar'),hd=document.querySelector('.hero .top');let w=null;const c=()=>{const on=hd.getBoundingClientRect().bottom<0;if(on===w)return;w=on;sb.classList.toggle('on',on);sb.setAttribute('aria-hidden',!on);sb.querySelectorAll('a').forEach(a=>a.tabIndex=on?0:-1)};addEventListener('scroll',c,{passive:true});c()}</script>
 <script src="js/totop.js"></script>
 <script src="js/footer.js?v=2"></script>
 </body>

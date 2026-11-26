@@ -21,11 +21,15 @@ details{border-top:1px solid #eef1ff;padding:4px 0}details:first-of-type{border-
 summary{cursor:pointer;list-style:none;font-weight:800;font-size:17px;padding:12px 0;display:flex;justify-content:space-between;gap:10px}
 summary::-webkit-details-marker{display:none}summary::after{content:"+";color:#5b3cff;font-size:24px;line-height:1;transition:.2s}details[open] summary::after{transform:rotate(45deg)}
 details p{margin:0 0 12px;color:#475569;line-height:1.9;font-size:16px}a{color:#5b3cff;font-weight:700}
+.sbar{position:fixed;top:0;left:0;right:0;z-index:200;background:linear-gradient(135deg,#5b3cff,#ec4899);box-shadow:0 6px 20px rgba(29,35,80,.25);transform:translateY(-110%);transition:transform .25s}.sbar.on{transform:none}
+.sbar-in{max-width:900px;margin:0 auto;padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:#fff}.sbar .brand{font-size:20px}.sbar .brand img{width:36px;height:36px;border-radius:10px}.sbar-t{font-size:17px}
+@media(max-width:560px){.sbar .brand{font-size:0;gap:0}.sbar-t{font-size:15px}.sbar .back{font-size:13px;padding:5px 12px}}
 </style>
 </head>
 <body>
 <header class="hero"><div class="top"><a class="brand" href="./"><img src="icon-192.png" alt="">فنتازيا</a><a class="back" href="./">↩ العودة للألعاب</a></div>
 <h1>الأسئلة الشائعة ❓</h1><p>كل ما يهم الأهل والأطفال والمعلنين</p></header>
+<div class="sbar" id="sbar" aria-hidden="true"><div class="sbar-in"><a class="brand" href="./" tabindex="-1"><img src="icon-192.png" alt="">فنتازيا</a><b class="sbar-t">الأسئلة الشائعة ❓</b><a class="back" href="./" tabindex="-1">↩ العودة للألعاب</a></div></div>
 <main>
 <section class="grp"><h2>👨‍👩‍👧 للأهل</h2>
 <details><summary>هل فنتازيا مجاني؟</summary><p>نعم، كل الألعاب مجانية بالكامل ولا توجد مشتريات داخلية. نغطي تكاليف الموقع بإعلانات آمنة ومراجعة يدوياً.</p></details>
@@ -49,6 +53,7 @@ details p{margin:0 0 12px;color:#475569;line-height:1.9;font-size:16px}a{color:#
 <section class="grp"><h2>✉️ تواصل معنا</h2>
 <p style="color:#475569;line-height:1.9;margin:0 0 6px">لم تجد إجابة سؤالك؟ راسلنا على <a href="mailto:alfwaris4ever@gmail.com" dir="ltr">alfwaris4ever@gmail.com</a> ونرد عليك بأسرع وقت.</p></section>
 </main>
+<script>{const sb=document.getElementById('sbar'),hd=document.querySelector('.hero .top');let w=null;const c=()=>{const on=hd.getBoundingClientRect().bottom<0;if(on===w)return;w=on;sb.classList.toggle('on',on);sb.setAttribute('aria-hidden',!on);sb.querySelectorAll('a').forEach(a=>a.tabIndex=on?0:-1)};addEventListener('scroll',c,{passive:true});c()}</script>
 <script src="js/totop.js"></script>
 <script src="js/footer.js?v=2"></script>
 </body>
