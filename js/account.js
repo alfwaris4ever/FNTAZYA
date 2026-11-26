@@ -59,10 +59,9 @@ function accNudge(){if(ACC.token||$('.acc-ov')||!ACC.online)return;const last=st
     <div class="acc-perks"><span>💾 حفظ المراحل</span><span>📱 العب من أي جهاز</span><span>✨ ألعاب تناسبك</span></div>
     <div class="acc-btns"><button class="play-btn" data-go>👤 اعمل حسابي</button><button class="play-btn alt" data-later>لاحقاً</button></div><small class="acc-note">الحساب اختياري، واللعب بدون حساب متاح دائماً.</small>`);
   ov.querySelector('[data-go]').onclick=()=>openAuth();ov.querySelector('[data-later]').onclick=()=>ov.remove();centerOnStage(ov)}
-/* على الكمبيوتر: نضع النافذة في منتصف شاشة اللعبة (طولاً وعرضاً) بدل منتصف الصفحة */
+/* نضع النافذة في منتصف شاشة اللعبة (طولاً وعرضاً) بدل منتصف الصفحة، على كل الأجهزة */
 function centerOnStage(ov){const st=$('#stage'),vg=$('#view-game');if(!st||!vg||vg.hidden)return;
   const fit=()=>{if(!ov.isConnected)return removeEventListener('resize',fit);
-    if(innerWidth<1024){ov.style.padding='';return}
     const r=st.getBoundingClientRect(),t=Math.max(14,r.top),b=Math.max(14,innerHeight-Math.min(innerHeight,r.bottom)),l=Math.max(14,r.left),rt=Math.max(14,innerWidth-r.right);
     if(innerHeight-t-b<ov.querySelector('.acc-card').offsetHeight+10){ov.style.padding='';return} // شاشة اللعبة أقصر من النافذة: نعود لمنتصف الصفحة
     ov.style.padding=`${t}px ${rt}px ${b}px ${l}px`};
