@@ -34,6 +34,11 @@ label{display:flex;flex-direction:column;gap:4px;font-weight:700}
 input,select,textarea{font:inherit;font-size:16px;padding:10px 12px;border-radius:12px;border:2px solid #e2e6ff;outline:none;background:#fff}input:focus,select:focus,textarea:focus{border-color:#5b3cff}
 textarea{min-height:110px;resize:vertical}
 #msg{font-weight:700;min-height:1.4em}#msg.ok{color:#16a34a}#msg.err{color:#dc2626}
+.scta{position:fixed;top:0;left:0;right:0;z-index:200;background:linear-gradient(135deg,#5b3cff,#ec4899);box-shadow:0 6px 20px rgba(29,35,80,.25);transform:translateY(-110%);transition:transform .25s}
+.scta.on{transform:none}.scta-in{max-width:1050px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.scta .brand{display:flex;align-items:center;gap:8px;color:#fff;font-weight:800;font-size:20px;text-decoration:none}.scta .brand img{width:36px;height:36px;border-radius:10px}
+.scta-b{display:flex;gap:8px}.btn.sm{font-size:15px;padding:8px 18px;box-shadow:0 4px 0 #ca8a04}.btn.sm.wh{background:#fff;box-shadow:0 4px 0 #c7d2fe}
+@media(max-width:560px){.scta .brand span,.scta .brand{font-size:0}.scta .brand img{width:32px;height:32px}.scta-b{flex:1;justify-content:flex-end}.btn.sm{font-size:13px;padding:7px 12px}}
 footer{text-align:center;color:#64748b;font-weight:600;padding:10px 16px 30px}
 </style>
 </head>
@@ -42,8 +47,9 @@ footer{text-align:center;color:#64748b;font-weight:600;padding:10px 16px 30px}
   <div class="top"><a class="brand" href="./"><img src="icon-192.png" alt="">فنتازيا</a><span><a class="back" href="advertiser.html">🔑 دخول المعلنين</a> <a class="back" href="./">↩ العودة للألعاب</a></span></div>
   <h1>أعلن في فنتازيا 📢</h1>
   <p>أوصل علامتك التجارية إلى العائلات العربية وأطفالهم من 3 إلى 12 سنة، في بيئة ألعاب آمنة وتعليمية يثق بها الأهل.</p>
-  <a class="btn" href="advertiser.html">🚀 أنشئ حملتك الآن</a> <a class="btn" href="#prices" style="background:#fff;box-shadow:0 6px 0 #c7d2fe">💰 الأسعار</a>
+  <div id="heroCta"><a class="btn" href="advertiser.html">🚀 أنشئ حملتك الآن</a> <a class="btn" href="#prices" style="background:#fff;box-shadow:0 6px 0 #c7d2fe">💰 الأسعار</a></div>
 </header>
+<div class="scta" id="scta" aria-hidden="true"><div class="scta-in"><a class="brand" href="./"><img src="icon-192.png" alt="">فنتازيا</a><span class="scta-b"><a class="btn sm" href="advertiser.html" tabindex="-1">🚀 أنشئ حملتك الآن</a><a class="btn sm wh" href="#prices" tabindex="-1">💰 الأسعار</a></span></div></div>
 <main>
   <section class="card">
     <h2>📊 فنتازيا بالأرقام</h2>
@@ -108,6 +114,8 @@ footer{text-align:center;color:#64748b;font-weight:600;padding:10px 16px 30px}
 </main>
 <footer>© فنتازيا 2026 · <a href="./">العودة للألعاب</a></footer>
 <script>
+{const sc=document.getElementById('scta'),hc=document.getElementById('heroCta');let was=null;const chk=()=>{const on=hc.getBoundingClientRect().bottom<0;if(on===was)return;was=on;sc.classList.toggle('on',on);sc.setAttribute('aria-hidden',!on);sc.querySelectorAll('a').forEach(a=>a.tabIndex=on?0:-1)};addEventListener('scroll',chk,{passive:true});addEventListener('resize',chk);chk()}
+document.querySelectorAll('a[href="#prices"]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();const t=document.getElementById('prices');scrollTo({top:t.getBoundingClientRect().top+scrollY-80,behavior:'smooth'})}));
 fetch('api/index.php?a=adpricing').then(r=>r.json()).then(j=>{if(!j.ok)return;const c=j.settings.currency,m=v=>Number(v).toLocaleString('en-US')+' '+c;
   document.getElementById('pt').innerHTML='<tr style="background:#f5f3ff"><th style="padding:10px;text-align:right">المساحة</th><th style="padding:10px;text-align:right">المقاسات</th><th style="padding:10px;text-align:right">1000 ظهور</th><th style="padding:10px;text-align:right">يوم حصري</th></tr>'+j.slots.map(s=>'<tr style="border-bottom:1px solid #eef1ff"><td style="padding:10px;font-weight:700">'+s.t+'</td><td style="padding:10px;color:#64748b;font-size:13px">'+s.size+'</td><td style="padding:10px">'+(s.price.cpm_on?m(s.price.cpm):'—')+'</td><td style="padding:10px">'+(s.price.daily_on?m(s.price.daily):'—')+'</td></tr>').join('')+(+j.settings.vat?'':'')}).catch(()=>{});
 fetch('api/index.php?a=pubstats').then(r=>r.json()).then(j=>{if(j.ok&&j.visitors30>=500){const v=document.getElementById('vis');v.querySelector('b').textContent='+'+j.visitors30.toLocaleString('en-US');v.hidden=false}}).catch(()=>{});
@@ -119,5 +127,6 @@ f.onsubmit=async e=>{e.preventDefault();m.className='';const d=Object.fromEntrie
     if(!j.ok)throw new Error(j.error);m.className='ok';m.textContent='✅ وصلنا طلبك! سنتواصل معك خلال يومي عمل.';f.reset()}
   catch(er){m.className='err';m.textContent=er.message||'تعذّر الإرسال، جرّب بعد قليل'}b.disabled=false};
 </script>
+<script src="js/totop.js"></script>
 </body>
 </html>
