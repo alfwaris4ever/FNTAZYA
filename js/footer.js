@@ -42,7 +42,7 @@
   const pathB = 'M0 60 L0 40 C240 10 480 10 720 40 S1200 70 1440 40 C1680 10 1920 10 2160 40 S2640 70 2880 40 L2880 60 Z';
   const f = document.createElement('footer'); f.id = 'fzFoot'; f.setAttribute('role', 'contentinfo');
   f.innerHTML = `<div class="ff-edge">${wave('b', pathB)}${wave('a', pathA)}</div><div class="ff-body"><span class="ff-shard"></span>
-    <div class="ff-in"><a class="ff-brand" href="./"><img src="icon-192.png" alt=""><span>فنتازيا<small>وقت اللعب الصح</small></span></a>
+    <div class="ff-in"><a class="ff-brand" href="./"><img src="icon-192.png" alt=""><span>فنتازيا<small>لعبة ومعلومة</small></span></a>
     <nav aria-label="روابط الموقع">${LINKS.map(([h, e, t]) => `<a href="${h}"${here === h ? ' class="on" aria-current="page"' : ''}><span aria-hidden="true">${e}</span>${t}</a>`).join('')}</nav></div>
     <div class="ff-copy">© فنتازيا 2026 · ألعاب آمنة وتعليمية للأطفال · تعمل على الجوال والتابلت والكمبيوتر</div></div>`;
   /* إلصاق الفوتر بأسفل الشاشة إذا كانت الصفحة قصيرة */
