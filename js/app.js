@@ -89,10 +89,22 @@ const BRAIN_MAP={mem:['memory-animals','memory-fruits','memory-space','simon','b
   const rev={};for(const[s,ids]of Object.entries(BRAIN_MAP))ids.forEach(id=>rev[id]=s);
   GAMES.forEach(g=>{if(rev[g.id])g.cat=rev[g.id];else if(g.cat==='brain')g.cat='logic'})}
 /* شريط التصنيفات أعلى الصفحة بجانب الشعار (صفّان كحد أقصى) */
-$('#cats').innerHTML=Object.entries(CATS).filter(([k])=>!BRAIN_SUBS.includes(k)).map(([k,v])=>`<a class="cat-chip" data-k="${k}" href="#/cat/${k}" style="--c1:${v.c[0]};--c2:${v.c[1]}"><span>${v.e}</span>${v.t}</a>`).join('');
+const NAV_CATS=Object.entries(CATS).filter(([k])=>!BRAIN_SUBS.includes(k)&&k!=='fav'&&k!=='recent'); // المفضلة ولعبت مؤخراً أيقونات في بلوك الشعار، وليست تصنيفات
+$('#cats').innerHTML=NAV_CATS.map(([k,v])=>`<a class="cat-chip" data-k="${k}" href="#/cat/${k}" style="--c1:${v.c[0]};--c2:${v.c[1]}"><span>${v.e}</span>${v.t}</a>`).join('');
 function fitCats(){const b=$('#cats');if(!b||b.offsetParent===null)return;b.style.setProperty('--cr',1);b.classList.remove('two');
   if(new Set([...b.children].map(c=>c.offsetTop)).size>2)b.classList.add('two');const gs=getComputedStyle(b.parentElement),cell=parseFloat(gs.gridAutoRows)||94;b.style.setProperty('--cr',b.scrollHeight>cell+2?2:1)}
 addEventListener('resize',fitCats);
+/* قائمة التصنيفات الجانبية (☰) للجوال والتابلت: تفتح من اليمين */
+{const dr=document.createElement('div');dr.className='cat-drawer';dr.id='catDrawer';dr.hidden=true;
+  dr.innerHTML=`<div class="cd-bg" data-close></div><aside class="cd-panel" role="dialog" aria-modal="true" aria-label="التصنيفات"><div class="cd-head"><b>التصنيفات</b><button class="cd-x" type="button" data-close aria-label="إغلاق">✕</button></div>
+    <nav class="cd-list">${NAV_CATS.map(([k,v])=>`<a class="cd-item" data-k="${k}" href="#/cat/${k}" style="--c1:${v.c[0]};--c2:${v.c[1]}"><span>${v.e}</span>${v.t}</a>`).join('')}</nav>
+    <div class="cd-sep"></div><nav class="cd-list"><a class="cd-item cd-plain" href="#/"><span>🏠</span>الرئيسية</a><a class="cd-item cd-plain" href="#/cat/fav"><span>❤️</span>المفضلة</a><a class="cd-item cd-plain" href="#/cat/recent"><span>🕒</span>لعبت مؤخراً</a></nav></aside>`;
+  document.body.append(dr);const mb=$('#menuBtn');
+  const open=()=>{const c=(location.hash.match(/^#\/cat\/(\w+)/)||[])[1];dr.querySelectorAll('.cd-item[data-k]').forEach(a=>a.classList.toggle('on',a.dataset.k===c||(BRAIN_SUBS.includes(c)&&a.dataset.k==='brain')));
+    dr.hidden=false;requestAnimationFrame(()=>dr.classList.add('on'));mb?.setAttribute('aria-expanded','true');document.body.style.overflow='hidden';dr.querySelector('.cd-x').focus()};
+  const close=()=>{if(dr.hidden)return;dr.classList.remove('on');mb?.setAttribute('aria-expanded','false');document.body.style.overflow='';setTimeout(()=>{dr.hidden=true},250)};
+  mb?.addEventListener('click',open);dr.addEventListener('click',e=>{if(e.target.closest('[data-close]')||e.target.closest('a'))close()});
+  addEventListener('keydown',e=>{if(e.key==='Escape')close()});addEventListener('hashchange',close)}
 
 /* ---------- views ---------- */
 let cur=null,curGame=null;
