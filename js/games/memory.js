@@ -4,7 +4,8 @@ const MEMGRID={3:[3,2],4:[4,2],6:[4,3],8:[4,4],10:[5,4],12:[6,4]};
 G.memory=(theme,boost=0)=>(root,c)=>{
   const L=Math.min(LEVELS-1,c.lv+boost),tt=L/(LEVELS-1),lerp=(a,b)=>a+(b-a)*tt;
   const n=[3,4,6,8,10,12][Math.min(5,Math.floor(tt*6))],[cols,rows]=MEMGRID[n],set=shuffle(MEM[theme]).slice(0,n);
-  const peek=Math.max(0,Math.round(lerp(3000,-600))),back=Math.round(lerp(1200,450)),limit=L>=10?Math.round(n*lerp(3.6,2.1)):0;
+  /* لعبة تذكر وليست سباقاً: البطاقات تظهر مكشوفة بلا وقت، والطفل يضغط «ابدأ الآن» متى ما حفظ أماكنها. وبطاقتا الخطأ تبقيان ظاهرتين وقتاً كافياً */
+  const back=Math.round(lerp(1300,900)),limit=L>=10?Math.round(n*lerp(3.6,2.1)):0;
   let open=[],done=0,moves=0,lock=true;
   root.innerHTML=`<div class="hud">${c.tag}<span class="pill">🔁 <b class="mv">0</b>${limit?` من ${limit}`:''}</span><span class="pill">✅ <b class="dn">0</b> من ${n}</span></div><div class="body"><div class="mem-grid" style="--cols:${cols};--rows:${rows}"></div></div>`;
   const grid=root.querySelector('.mem-grid'),mv=root.querySelector('.mv'),dn=root.querySelector('.dn');
@@ -17,5 +18,8 @@ G.memory=(theme,boost=0)=>(root,c)=>{
       else{lock=true;c.after(()=>{a.classList.remove('flip');d.classList.remove('flip');lock=false},back)}
       if(limit&&moves>=limit&&done<n)c.after(()=>c.lose('انتهت الحركات!',{got:done,total:n,label:'الأزواج'}),600)};
     grid.append(b);return b});
-  if(peek>0){cards.forEach(b=>b.classList.add('flip'));c.after(()=>{cards.forEach(b=>b.classList.remove('flip'));lock=false},peek)}else lock=false;
+  cards.forEach(b=>b.classList.add('flip'));
+  const go=h(`<div class="mem-go" style="position:absolute;left:50%;bottom:clamp(10px,3cqmin,22px);translate:-50% 0;z-index:5;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none"><div style="background:rgba(29,35,80,.85);color:#fff;border-radius:14px;padding:6px 14px;font-weight:800;font-size:clamp(13px,3.4cqmin,18px)">👀 احفظ أماكن الصور، ثم اضغط «ابدأ الآن»</div><button class="play-btn" style="pointer-events:auto">▶ ابدأ الآن</button></div>`);root.append(go);grid.style.width='min(96cqw,calc((100cqh - var(--hud,58px) - 16px - clamp(100px,22cqmin,130px)) * var(--cols) / var(--rows)))';grid.style.marginBottom='clamp(100px,22cqmin,130px)';
+  let begun=false;const begin=()=>{if(begun)return;begun=true;go.remove();grid.style.width='';grid.style.marginBottom='';sfx.pop();cards.forEach(b=>b.classList.remove('flip'));c.after(()=>{lock=false},350)};
+  go.querySelector('button').onclick=begin;c.on(window,'keydown',e=>{if(!begun&&(e.key==='Enter'||e.key===' ')){e.preventDefault();e.stopPropagation();begin()}});
 };
