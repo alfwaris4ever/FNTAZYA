@@ -1,5 +1,5 @@
 :root{
-  --cell:94px; --gap:16px; --pad:24px; --r:18px;
+  --cell:152px; --gap:16px; --pad:24px; --r:18px;
   --bg:#cfe4ff; --ink:#1d2350; --brand:#5b3cff; --brand2:#ff4f9a; --card:#fff;
   --shadow:0 5px 0 rgba(29,35,80,.10),0 10px 22px rgba(29,35,80,.12);
   --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
@@ -341,8 +341,8 @@ a{color:inherit;text-decoration:none}
 @keyframes wobble{50%{border-radius:55% 45% 48% 52%/45% 55% 45% 55%;transform:rotate(6deg)}}
 
 /* ============ RESPONSIVE ============ */
-@media (min-width:1600px){:root{--cell:108px;--gap:18px}}
-@media (min-width:600px) and (max-width:1023px){:root{--cell:88px;--gap:12px;--pad:16px}}
+@media (min-width:1600px){:root{--cell:160px;--gap:18px}}
+@media (min-width:600px) and (max-width:1023px){:root{--cell:136px;--gap:12px;--pad:16px}}
 @media (max-width:1023px){
   .game-layout{grid-template-columns:minmax(0,1fr)}
   .related{position:static}
@@ -350,7 +350,7 @@ a{color:inherit;text-decoration:none}
 }
 /* phones: 4 columns on large phones, 3 on normal */
 @media (max-width:599px){
-  :root{--pad:12px;--gap:10px;--r:15px;--cell:calc((100cqw - var(--gap)*3) / 4 - .5px)}
+  :root{--pad:12px;--gap:10px;--r:15px;--cell:calc((100cqw - var(--gap)*2) / 3 - .5px)}
   #grid{grid-template-rows:60px}
   .logo-card{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between;top:8px;padding:8px 10px}
   .logo small{display:none}
@@ -863,3 +863,11 @@ a{color:inherit;text-decoration:none}
 .cat-bar{position:sticky;top:12px;z-index:19;align-self:start;background:rgba(255,255,255,.7);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-radius:var(--r);box-shadow:var(--shadow);padding:8px 10px}
 .cat-bar.two{-webkit-mask-image:none;mask-image:none}
 @media (max-width:599px){.cat-bar{top:calc(8px + 60px + var(--gap));padding:6px 8px}}
+
+/* ===== مقاس موحد للأيقونات (26 نوفمبر 2026): مربعات متساوية واسم اللعبة ظاهر دائماً، بدل خلطة الكبير والصغير ===== */
+.grid>.tile.big{grid-column:auto;grid-row:auto}
+.tile.big .emo{font-size:calc(var(--cell)*.5);margin-bottom:0}
+.tile .name,.tile.big .name{opacity:1;transform:none;font-size:clamp(12px,calc(var(--cell)*.1),16px);padding:20px 6px 8px}
+/* قائمة «ألعاب قد تعجبك» الجانبية تبقى بمقاسها السابق على الكمبيوتر */
+@media (min-width:1024px){.related{--cell:94px}.related .tile .name{font-size:12px;padding:16px 4px 6px}}
+@media (min-width:1600px){.related{--cell:108px}}
