@@ -105,13 +105,12 @@ const AdForm = (() => {
     x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
     for (let i = 0; i <= Math.max(W, H); i += 10 * k) { x.strokeStyle = i % (50 * k) ? '#f1f4ff' : '#dfe5ff'; x.lineWidth = 1; x.beginPath(); x.moveTo(i + 0.5, 0); x.lineTo(i + 0.5, H); x.moveTo(0, i + 0.5); x.lineTo(W, i + 0.5); x.stroke(); }
     // المنطقة الآمنة (الحواف تُقص بانحناء الزوايا)
-    x.setLineDash([6 * k, 4 * k]); x.strokeStyle = '#5b3cff'; x.lineWidth = 2 * k; x.strokeRect(9 * k, 9 * k, W - 18 * k, H - 18 * k); x.setLineDash([]);
     x.strokeStyle = '#94a3b8'; x.lineWidth = k; x.beginPath(); x.roundRect ? x.roundRect(k / 2, k / 2, W - k, H - k, 14 * k) : x.rect(k / 2, k / 2, W - k, H - k); x.stroke();
     // مكان شارة «إعلان» (أعلى اليمين) لا تضع فيها نصاً مهماً
     x.fillStyle = 'rgba(239,68,68,.16)'; x.strokeStyle = '#ef4444'; x.lineWidth = k; x.fillRect(W - 52 * k, 4 * k, 48 * k, 20 * k); x.strokeRect(W - 52 * k, 4 * k, 48 * k, 20 * k);
     x.fillStyle = '#b91c1c'; x.font = `bold ${11 * k}px Tahoma, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.direction = 'rtl'; x.fillText('إعلان', W - 28 * k, 14.5 * k);
     // النصوص: نموذج إعلان فنتازيا ← موقع الإعلان ← الجهاز ← المقاس ← الشروط
-    const lines = [['نموذج إعلان فنتازيا', '#5b3cff', 'bold', 1], [slotTitle, '#1d2350', 'bold', 1.05], [devName, '#1d2350', '', 0.9], [`${W} × ${H} px`, '#ec4899', 'bold', 1], ['RGB · PNG أو JPG · حتى 1.5MB · صمّم داخل الخط المتقطع', '#64748b', '', 0.62]];
+    const lines = [['نموذج إعلان فنتازيا', '#5b3cff', 'bold', 1], [slotTitle, '#1d2350', 'bold', 1.05], [devName, '#1d2350', '', 0.9], [`${W} × ${H} px`, '#ec4899', 'bold', 1], ['RGB · PNG أو JPG · حتى 1.5MB · أبعد النصوص المهمة عن الحواف', '#64748b', '', 0.62]];
     const avail = H - 24 * k, tot = lines.reduce((s, l) => s + l[3] * 1.22, 0), f = Math.min(avail / tot, W * 0.045, 30 * k);
     let y = H / 2 - (tot * f) / 2;
     lines.forEach(([t, col, wt, sc], i) => { const z = f * sc; x.font = `${wt} ${z}px Tahoma, sans-serif`; x.fillStyle = col; x.direction = i === 3 ? 'ltr' : 'rtl'; y += (z * 1.22) / 2; x.fillText(t, W / 2, y, W - 120 * k); y += (z * 1.22) / 2; });
@@ -140,7 +139,7 @@ const AdForm = (() => {
             <div class="af-cr-act"><button type="button" class="af-tpl" data-tpl title="تحميل نموذج فارغ بالمقاس الصحيح للتصميم عليه">⬇️ تحميل النموذج</button><label class="af-up">📁 ${v ? 'تغيير' : 'رفع صورة'}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>${v ? '<button type="button" class="af-rm" data-rm>🗑️</button>' : ''}</div></div>`; }).join('')}</div></div>`; }).join('') : '<p class="af-pv-n">اختر المساحات أولاً لتظهر خانات الصور.</p>';
       box.querySelectorAll('[data-pv]').forEach((b) => (b.onclick = () => preview(b.dataset.pv, slots.find((x) => x.slot === b.dataset.pv).t)));
       box.querySelectorAll('.af-cr-tile').forEach((t) => { const { s, d: dv, w, h } = t.dataset, key = s + dv, S = slots.find((x) => x.slot === s); check(t, +w, +h);
-        t.querySelector('[data-tpl]').onclick = () => template(S.t, Object.keys(S.dev).length === 1 ? 'كل الأجهزة' : DEV[dv].replace(/^\S+\s/, ''), +w, +h, `fntazya-${s}-${dv}-${w * SCALE}x${h * SCALE}.png`);
+        t.querySelector('[data-tpl]').onclick = () => template(S.t, Object.keys(S.dev).length === 1 ? 'كل الأجهزة' : DEV[dv].replace(/^\S+\s/, ''), +w, +h, `${slots.findIndex((x) => x.slot === s) + 1}-${s}-${dv}-${w * SCALE}x${h * SCALE}.png`);
         t.querySelector('input[type=file]').onchange = async (e) => { const fl = e.target.files[0]; e.target.value = ''; if (!fl) return;
           const bad = (m) => { msgs[key] = '⛔ ' + m; onErr?.(`${S.t} (${DEV[dv] || ''}): ${m}`); draw(); };
           if (fl.size > 1500000) return bad('حجم الملف أكبر من 1.5 ميغا');
