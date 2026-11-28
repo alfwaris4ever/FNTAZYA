@@ -7,6 +7,9 @@ G.piano=(root,c)=>{
   const L=4,goal=c.fi(14,60),spd=c.f(240,640),allow=c.lv<10?3:c.lv<20?1:0,mel=MELO[rnd(0,MELO.length-1)];let tiles=[],hits=0,mist=0,spawnY=0,ni=0,lastLane=-1,started=false;
   const A=arena(root,c,{W:600,H:900,flex:[1.05,1.8],hud:`<span class="pill">🎹 <b class="ht">0</b> من ${goal}</span><span class="pill">❌ <b class="ms">0</b> من ${allow}</span>`,
     onDown:p=>tap(Math.floor(p.x/(A.W/L))),onKey:k=>{const m={KeyD:0,KeyF:1,KeyJ:2,KeyK:3,Digit1:0,Digit2:1,Digit3:2,Digit4:3,ArrowLeft:0,ArrowDown:1,ArrowUp:2,ArrowRight:3}[k];if(m!==undefined)tap(m)}});
+  /* مؤشر ماوس أبيض لأن الخلفية داكنة */
+  const WCUR=`url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><path d="M3 2 L3 22 L8.5 17 L12.5 26 L16 24.5 L12 15.8 L19.5 15.8 Z" fill="#fff" stroke="#1e1b4b" stroke-width="1.8" stroke-linejoin="round"/></svg>')}") 3 2, auto`;
+  root.style.cursor=WCUR;root.querySelectorAll('canvas').forEach(e=>e.style.cursor=WCUR);
   const res=()=>({got:hits,total:goal,label:'النغمات'});
   function addRow(y){let ln;do{ln=rnd(0,L-1)}while(ln===lastLane&&Math.random()<.7);lastLane=ln;tiles.push({ln,y,hit:false,i:ni++})}
   for(let k=0;k<6;k++)addRow(-k*230+200);
