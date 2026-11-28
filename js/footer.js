@@ -1,5 +1,5 @@
 /* فنتازيا: فوتر موحّد لكل صفحات الموقع
-   - أبيض بحافة علوية مائلة متكسّرة (مثل بوكي) مع موجة ولمعة متحركة في بدايته.
+   - أبيض بحافة علوية من طبقتين تموّج ناعم متحرك (بلا زوايا ولا مثلثات)، مع توهّج ناعم متحرك.
    - يلتصق دائماً بأسفل الشاشة في الصفحات القصيرة، فلا يبقى فراغ تحته. */
 (() => {
   if (document.getElementById('fzFoot')) return;
@@ -18,9 +18,12 @@
 #fzFoot .ff-edge svg.b{opacity:.55;animation-duration:22s;animation-direction:reverse;bottom:6px}
 @keyframes ffWave{to{transform:translateX(-50%)}}
 #fzFoot .ff-body{position:relative;background:#fff;padding:26px 20px 22px;box-shadow:0 -1px 0 rgba(91,60,255,.04)}
-#fzFoot .ff-shard{position:absolute;top:0;bottom:0;inset-inline-start:22%;width:70px;background:linear-gradient(180deg,rgba(91,60,255,.09),rgba(236,72,153,.03) 60%,transparent);
-  clip-path:polygon(35% 0,100% 0,65% 100%,0 100%);animation:ffShard 6s ease-in-out infinite;pointer-events:none;z-index:-1}
-@keyframes ffShard{0%,100%{transform:translateX(0);opacity:.7}50%{transform:translateX(-26px);opacity:1}}
+#fzFoot .ff-shard{position:absolute;top:-10px;inset-inline-start:18%;width:220px;height:140px;border-radius:50%;background:radial-gradient(closest-side,rgba(91,60,255,.10),rgba(236,72,153,.05) 60%,transparent);
+  filter:blur(8px);animation:ffShard 8s ease-in-out infinite;pointer-events:none;z-index:-1}
+@keyframes ffShard{0%,100%{transform:translateX(0);opacity:.7}50%{transform:translateX(-40px);opacity:1}}
+/* على الشاشات الصغيرة نمدّ الموجة أكثر حتى تبقى ناعمة ولا تنضغط */
+@media(max-width:1023px){#fzFoot .ff-edge svg{width:400%}}
+@media(max-width:600px){#fzFoot .ff-edge svg{width:700%}}
 #fzFoot .ff-in{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
 #fzFoot .ff-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#5b3cff;font-weight:800;font-size:24px}
 #fzFoot .ff-brand img{width:44px;height:44px;border-radius:13px;animation:ffBob 3.2s ease-in-out infinite}
@@ -36,10 +39,11 @@
 @media print{#fzFoot{display:none}}`;
   document.head.appendChild(st);
   const wave = (cls, d) => `<svg class="${cls}" viewBox="0 0 2880 60" preserveAspectRatio="none" aria-hidden="true"><path fill="#fff" d="${d}"/></svg>`;
-  // حافة مائلة متكسّرة + موجة، مكررة مرتين لتتحرك بلا انقطاع
-  const seg = 'L120 30 L260 44 L420 18 L560 40 L720 22 L880 46 L1040 14 L1200 38 L1340 26 L1440 34';
-  const pathA = 'M0 60 L0 34 ' + seg + ' ' + seg.replace(/L(\d+)/g, (m, n) => 'L' + (+n + 1440)) + ' L2880 60 Z';
-  const pathB = 'M0 60 L0 40 C240 10 480 10 720 40 S1200 70 1440 40 C1680 10 1920 10 2160 40 S2640 70 2880 40 L2880 60 Z';
+  // طبقتان من موجة ناعمة (منحنيات فقط)، كل منهما تتكرر مرتين لتتحرك بلا انقطاع
+  const smooth = (y, amp, step) => { let d = `M0 60 L0 ${y} C${step / 3} ${y - amp} ${(2 * step) / 3} ${y - amp} ${step} ${y}`; let up = false;
+    for (let x = 2 * step; x <= 2880; x += step) { d += ` S${x - step / 3} ${up ? y - amp : y + amp} ${x} ${y}`; up = !up; } return d + ' L2880 60 Z'; };
+  const pathA = smooth(32, 12, 360);
+  const pathB = smooth(36, 16, 720); // الدورة تقسم 1440 حتى تتكرر الحركة بلا قفزة
   const f = document.createElement('footer'); f.id = 'fzFoot'; f.setAttribute('role', 'contentinfo');
   f.innerHTML = `<div class="ff-edge">${wave('b', pathB)}${wave('a', pathA)}</div><div class="ff-body"><span class="ff-shard"></span>
     <div class="ff-in"><a class="ff-brand" href="./"><img src="icon-192.png" alt=""><span>فنتازيا<small>لعبة ومعلومة</small></span></a>
