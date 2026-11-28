@@ -452,7 +452,12 @@ switch ($a) {
   }
   case 'adv_forgot': { // رابط إعادة تعيين كلمة المرور (صالح ساعة)
     $email = cleanEmail($b['email'] ?? '');
+    advLimit($email); // نفس حد محاولات الدخول (6 لكل بريد و30 لكل IP خلال ربع ساعة)
     $st = db()->prepare('SELECT * FROM advertisers WHERE email=?'); $st->execute([$email]); $u = $st->fetch();
+    if (!$u) { // لا نقبل إعادة التعيين لبريد غير مسجّل
+      db()->prepare('INSERT INTO attempts(email,ip,ts) VALUES(?,?,?)')->execute(['adv:' . $email, ip(), time()]);
+      fail('هذا البريد غير مسجّل كمعلن. تأكد من البريد أو أنشئ حساب معلن جديد');
+    }
     if ($u) {
       $c = db()->prepare('SELECT COUNT(*) FROM adv_resets WHERE adv_id=? AND created>?'); $c->execute([$u['id'], time() - 3600]);
       if ($c->fetchColumn() >= 3) fail('أرسلنا لك رسائل كثيرة، تحقق من بريدك (والرسائل غير المرغوب فيها) أو جرّب بعد ساعة', 429);
@@ -464,7 +469,7 @@ switch ($a) {
         . '<p><a href="' . h($link) . '" style="background:#5b3cff;color:#fff;padding:10px 20px;border-radius:99px;text-decoration:none;font-weight:bold">اختيار كلمة مرور جديدة</a></p><p style="font-size:13px;color:#64748b">إذا لم تطلب ذلك تجاهل هذه الرسالة، وستبقى كلمة مرورك كما هي.</p>',
         "لإعادة تعيين كلمة المرور (صالح ساعة): $link"); } catch (Throwable $e) { error_log('adv_forgot: ' . $e->getMessage()); }
     }
-    out(['ok' => true]); // نفس الرد دائماً حتى لا يُعرف إن كان البريد مسجلاً
+    out(['ok' => true]);
   }
   case 'adv_reset': {
     $t = (string)($b['token'] ?? ''); $pass = (string)($b['password'] ?? '');
