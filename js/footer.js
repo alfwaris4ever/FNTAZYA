@@ -17,7 +17,8 @@
 #fzFoot .ff-edge svg{position:absolute;bottom:0;left:0;width:200%;height:100%;animation:ffWave 14s linear infinite}
 #fzFoot .ff-edge svg.b{opacity:.55;animation-duration:22s;animation-direction:reverse;bottom:6px}
 @keyframes ffWave{to{transform:translateX(-50%)}}
-#fzFoot .ff-body{position:relative;background:#fff;padding:26px 20px 22px;box-shadow:0 -1px 0 rgba(91,60,255,.04)}
+#fzFoot{overflow-x:clip} /* التوهّج المتحرك لا يسبب تمريراً أفقياً على الجوال */
+#fzFoot .ff-body{position:relative;overflow:hidden;background:#fff;padding:26px 20px 22px;box-shadow:0 -1px 0 rgba(91,60,255,.04)}
 #fzFoot .ff-shard{position:absolute;top:-10px;inset-inline-start:18%;width:220px;height:140px;border-radius:50%;background:radial-gradient(closest-side,rgba(91,60,255,.10),rgba(236,72,153,.05) 60%,transparent);
   filter:blur(8px);animation:ffShard 8s ease-in-out infinite;pointer-events:none;z-index:-1}
 @keyframes ffShard{0%,100%{transform:translateX(0);opacity:.7}50%{transform:translateX(-40px);opacity:1}}
