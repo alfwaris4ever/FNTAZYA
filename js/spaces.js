@@ -116,7 +116,7 @@
   async function onHome(cat) {
     hit(cat ? 'cat:' + cat : 'home'); pageKeys = [];
     const my = ++seq, s = await fetchSlots(['home_top'], cat); if (my !== seq) return;
-    place('home_top', s.home_top, document.querySelector('#cats'));
+    place('home_top', s.home_top, document.querySelector('#grid'), 'afterbegin');
   }
   async function onGame(g) {
     hit('game:' + g.id); pageKeys = [];

@@ -44,8 +44,8 @@ function topCatName(){const sc=catScores(),k=Object.keys(sc).sort((a,b)=>sc[b]-s
 
 /* على الصفحة الرئيسية: تُقدَّم الألعاب المقترحة إلى أول الشبكة بشارة «يناسبك» */
 {const sh=showHome;window.showHome=function(cat){const r=sh.apply(this,arguments);try{if(!cat)markRecommended()}catch(e){}return r}}
-function markRecommended(){const recs=recommended(4);if(!recs.length)return;const grid=$('#grid'),anchor=grid.querySelector('.cat-bar')||grid.querySelector('.logo-card');let after=anchor;
-  for(const g of recs){const t=grid.querySelector(`a.tile[href="#/play/${g.id}"]`);if(!t)continue;t.querySelector('.badge')?.remove();t.querySelector('.rec-ribbon')?.remove();t.insertAdjacentHTML('beforeend','<span class="rec-ribbon" aria-label="يناسبك"><b>يناسبك ⭐</b></span>');after.after(t);after=t}}
+function markRecommended(){const recs=recommended(4);if(!recs.length)return;const grid=$('#grid');let after=grid.querySelector(':scope>.fz-sp[data-slot=home_top]');
+  for(const g of recs){const t=grid.querySelector(`a.tile[href="#/play/${g.id}"]`);if(!t)continue;t.querySelector('.badge')?.remove();t.querySelector('.rec-ribbon')?.remove();t.insertAdjacentHTML('beforeend','<span class="rec-ribbon" aria-label="يناسبك"><b>يناسبك ⭐</b></span>');after?after.after(t):grid.prepend(t);after=t}}
 
 /* ---------- الواجهة ---------- */
 function renderAccBtn(){let b=$('#accBtn');if(!b){const box=$('.logo-actions');if(!box)return;b=h('<button class="icon-btn acc-btn" id="accBtn"></button>');box.append(b);b.onclick=()=>ACC.token?openDashboard():openAuth()}

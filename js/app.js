@@ -91,7 +91,7 @@ const BRAIN_MAP={mem:['memory-animals','memory-fruits','memory-space','simon','b
 /* شريط التصنيفات أعلى الصفحة بجانب الشعار (صفّان كحد أقصى) */
 const NAV_CATS=Object.entries(CATS).filter(([k])=>!BRAIN_SUBS.includes(k)&&k!=='fav'&&k!=='recent'); // المفضلة ولعبت مؤخراً أيقونات في بلوك الشعار، وليست تصنيفات
 $('#cats').innerHTML=NAV_CATS.map(([k,v])=>`<a class="cat-chip" data-k="${k}" href="#/cat/${k}" style="--c1:${v.c[0]};--c2:${v.c[1]}"><span>${v.e}</span>${v.t}</a>`).join('');
-function fitCats(){const b=$('#cats');if(!b||b.offsetParent===null)return;b.style.setProperty('--cr',1);b.classList.remove('two');
+function fitCats(){const b=$('#cats');if(!b||b.offsetParent===null||b.closest('.side'))return;b.style.setProperty('--cr',1);b.classList.remove('two');
   if(new Set([...b.children].map(c=>c.offsetTop)).size>2)b.classList.add('two');const gs=getComputedStyle(b.parentElement),cell=parseFloat(gs.gridAutoRows)||94;b.style.setProperty('--cr',b.scrollHeight>cell+2?2:1)}
 addEventListener('resize',fitCats);
 /* قائمة التصنيفات الجانبية (☰) للجوال والتابلت: تفتح من اليمين */
