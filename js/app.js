@@ -90,14 +90,15 @@ const BRAIN_MAP={mem:['memory-animals','memory-fruits','memory-space','simon','b
   GAMES.forEach(g=>{if(rev[g.id])g.cat=rev[g.id];else if(g.cat==='brain')g.cat='logic'})}
 /* شريط التصنيفات أعلى الصفحة بجانب الشعار (صفّان كحد أقصى) */
 const NAV_CATS=Object.entries(CATS).filter(([k])=>!BRAIN_SUBS.includes(k)&&k!=='fav'&&k!=='recent'); // المفضلة ولعبت مؤخراً أيقونات في بلوك الشعار، وليست تصنيفات
-$('#cats').innerHTML=NAV_CATS.map(([k,v])=>`<a class="cat-chip" data-k="${k}" href="#/cat/${k}" style="--c1:${v.c[0]};--c2:${v.c[1]}"><span>${v.e}</span>${v.t}</a>`).join('');
+const catCount=k=>GAMES.filter(g=>k==='brain'?BRAIN_SUBS.includes(g.cat):g.cat===k).length; // عدد ألعاب كل تصنيف
+$('#cats').innerHTML=NAV_CATS.map(([k,v])=>`<a class="cat-chip" data-k="${k}" href="#/cat/${k}" style="--c1:${v.c[0]};--c2:${v.c[1]}"><span>${v.e}</span>${v.t}<b class="cat-n" aria-label="${catCount(k)} لعبة">${catCount(k)}</b></a>`).join('');
 function fitCats(){const b=$('#cats');if(!b||b.offsetParent===null||b.closest('.side'))return;b.style.setProperty('--cr',1);b.classList.remove('two');
   if(new Set([...b.children].map(c=>c.offsetTop)).size>2)b.classList.add('two');const gs=getComputedStyle(b.parentElement),cell=parseFloat(gs.gridAutoRows)||94;b.style.setProperty('--cr',b.scrollHeight>cell+2?2:1)}
 addEventListener('resize',fitCats);
 /* قائمة التصنيفات الجانبية (☰) للجوال والتابلت: تفتح من اليمين */
 {const dr=document.createElement('div');dr.className='cat-drawer';dr.id='catDrawer';dr.hidden=true;
   dr.innerHTML=`<div class="cd-bg" data-close></div><aside class="cd-panel" role="dialog" aria-modal="true" aria-label="التصنيفات"><div class="cd-head"><b>التصنيفات</b><button class="cd-x" type="button" data-close aria-label="إغلاق">✕</button></div>
-    <nav class="cd-list">${NAV_CATS.map(([k,v])=>`<a class="cd-item" data-k="${k}" href="#/cat/${k}" style="--c1:${v.c[0]};--c2:${v.c[1]}"><span>${v.e}</span>${v.t}</a>`).join('')}</nav>
+    <nav class="cd-list">${NAV_CATS.map(([k,v])=>`<a class="cd-item" data-k="${k}" href="#/cat/${k}" style="--c1:${v.c[0]};--c2:${v.c[1]}"><span>${v.e}</span>${v.t}<b class="cat-n" aria-label="${catCount(k)} لعبة">${catCount(k)}</b></a>`).join('')}</nav>
     <div class="cd-sep"></div><nav class="cd-list"><a class="cd-item cd-plain" href="#/"><span>🏠</span>الرئيسية</a><a class="cd-item cd-plain" href="#/cat/fav"><span>❤️</span>المفضلة</a><a class="cd-item cd-plain" href="#/cat/recent"><span>🕒</span>لعبت مؤخراً</a></nav></aside>`;
   document.body.append(dr);const mb=$('#menuBtn');
   const open=()=>{const c=(location.hash.match(/^#\/cat\/(\w+)/)||[])[1];dr.querySelectorAll('.cd-item[data-k]').forEach(a=>a.classList.toggle('on',a.dataset.k===c||(BRAIN_SUBS.includes(c)&&a.dataset.k==='brain')));
