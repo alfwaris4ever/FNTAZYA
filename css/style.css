@@ -914,3 +914,34 @@ a{color:inherit;text-decoration:none}
 
 /* بلوك الشعار على الكمبيوتر: ارتفاعه بقدر محتواه وبنفس ارتفاع شريط التصنيفات، بلا فراغ أعلى وأسفل */
 @media (min-width:1024px){#grid{grid-template-rows:auto}.logo-card{gap:8px;padding:12px 14px}}
+
+/* ===== الكمبيوتر: سايد بار ثابت على اليمين (الشعار + التصنيفات)، والبانر العلوي بارتفاع 120 بجانب الشعار (28 نوفمبر 2026) ===== */
+.side{display:block}
+@media (max-width:1023px){
+  .side{position:sticky;top:8px;z-index:20;margin-bottom:var(--gap)}
+  .side .logo-card{position:static}
+  #grid{grid-template-rows:none}
+}
+@media (min-width:1024px){
+  .home{display:grid;grid-template-columns:240px minmax(0,1fr);gap:var(--gap);align-items:start}
+  .side{position:sticky;top:var(--pad);display:flex;flex-direction:column;gap:12px;max-height:calc(100vh - var(--pad)*2)}
+  .side .logo-card{position:static;height:120px;flex:none;justify-content:center;gap:8px;padding:10px 12px}
+  .side .logo-card .logo{font-size:28px}
+  .side .logo-actions{gap:6px}.side .logo-actions .icon-btn{height:36px}
+  .side #cats,.side #cats.two{position:static;align-self:stretch;width:auto;display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:8px;overflow-y:auto;overflow-x:hidden;min-height:0;
+    padding:10px;scrollbar-width:thin;-webkit-mask-image:none;mask-image:none}
+  .side .cat-chip{height:46px;border-radius:14px;font-size:15px;padding:0 14px;gap:10px;justify-content:flex-start;flex:none}
+  .side .cat-chip span{font-size:21px}
+  .side .cat-chip.on{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--c1)}
+  @media (hover:hover){.side .cat-chip:hover{transform:translateX(-3px)}}
+  /* الأيقونات تملأ عرض المنطقة بالتساوي وتبقى مربعة */
+  #grid{grid-template-columns:repeat(auto-fill,minmax(var(--cell),1fr));grid-auto-rows:auto;justify-content:stretch}
+  #grid>.tile{aspect-ratio:1/1}
+  #grid>.cat-head{min-height:var(--cell)}
+  /* البانر العلوي: نفس ارتفاع بلوك الشعار */
+  #grid>.fz-sp[data-slot=home_top]{height:120px;min-height:120px;align-self:start}
+  #grid>.fz-sp[data-slot=home_top] .fz-sp-house{height:120px;min-height:120px;box-sizing:border-box}
+  #grid>.fz-sp[data-slot=home_top].has-img .fz-sp-img{max-width:970px}
+  #grid>.fz-sp[data-slot=home_top].has-img .fz-sp-img img{height:120px;object-fit:cover}
+  #grid>.fz-sp[data-slot=home_top].fz-sp-net .fz-sp-frame{height:120px!important}
+}
