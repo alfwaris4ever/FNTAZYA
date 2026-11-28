@@ -78,7 +78,7 @@ function forgotView(email=''){document.getElementById('hdr').innerHTML='';
   <div class="full"><button class="btn" type="submit">إرسال الرابط</button> <button class="btn alt" type="button" id="bk">رجوع</button></div></form></div>`;
   app.querySelector('#bk').onclick=()=>authView();
   app.querySelector('#ff').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('[type=submit]');b.disabled=true;
-    try{await api('adv_forgot',{email:e.target.email.value},false);app.querySelector('.card').innerHTML=`<h2 class="ok">📧 تحقق من بريدك</h2><p>إذا كان <b dir="ltr">${esc(e.target.email.value)}</b> مسجّلاً كمعلن فسيصلك رابط إعادة التعيين خلال دقائق.</p><p class="note">لم يصلك؟ تحقق من مجلد الرسائل غير المرغوب فيها (Junk / Spam).</p><button class="btn alt" onclick="authView()">رجوع لتسجيل الدخول</button>`}
+    try{await api('adv_forgot',{email:e.target.email.value},false);app.querySelector('.card').innerHTML=`<h2 class="ok">📧 تحقق من بريدك</h2><p>أرسلنا رابط إعادة التعيين إلى <b dir="ltr">${esc(e.target.email.value)}</b>، ويصلك خلال دقائق.</p><p class="note">لم يصلك؟ تحقق من مجلد الرسائل غير المرغوب فيها (Junk / Spam).</p><button class="btn alt" onclick="authView()">رجوع لتسجيل الدخول</button>`}
     catch(er){app.querySelector('#er').textContent=er.message;b.disabled=false}}}
 function resetView(t){document.getElementById('hdr').innerHTML='';
   app.innerHTML=`<div class="card" style="max-width:540px;margin:20px auto"><h2>🔑 كلمة مرور جديدة</h2><form id="rf" class="frm"><label class="full">كلمة المرور الجديدة (8 أحرف على الأقل)<input name="p1" type="password" dir="ltr" required></label>
