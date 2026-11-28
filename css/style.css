@@ -911,3 +911,6 @@ a{color:inherit;text-decoration:none}
 .fz-sp-img img{border-radius:14px}
 .fz-sp:not(.has-img){outline:2px dashed rgba(91,60,255,.45);outline-offset:2px;overflow:hidden}
 .fz-sp-mini.has-img .fz-sp-img{outline-offset:2px}
+
+/* بلوك الشعار على الكمبيوتر: ارتفاعه بقدر محتواه وبنفس ارتفاع شريط التصنيفات، بلا فراغ أعلى وأسفل */
+@media (min-width:1024px){#grid{grid-template-rows:auto}.logo-card{gap:8px;padding:12px 14px}}
