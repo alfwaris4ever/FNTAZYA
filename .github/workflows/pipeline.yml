@@ -28,6 +28,9 @@ jobs:
         run: node scripts/ci-check.mjs
       - name: اختبار تشغيل الموقع في Chrome
         run: node scripts/smoke-test.mjs
+      - name: اختبار النسخة المدمجة (كما تُنشر) في Chrome
+        run: |
+          rm -rf /tmp/b && cp -r . /tmp/b && cd /tmp/b && node scripts/bundle.mjs && node scripts/smoke-test.mjs
 
   promote-staging:
     name: Promote dev -> staging
@@ -58,6 +61,9 @@ jobs:
         run: node scripts/ci-check.mjs
       - name: اختبار تشغيل الموقع في Chrome
         run: node scripts/smoke-test.mjs
+      - name: اختبار النسخة المدمجة (كما تُنشر) في Chrome
+        run: |
+          rm -rf /tmp/b && cp -r . /tmp/b && cd /tmp/b && node scripts/bundle.mjs && node scripts/smoke-test.mjs
 
   promote-main:
     name: Promote staging -> main
@@ -81,7 +87,9 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
-      - name: ختم نسخة لملفات JS وCSS حتى لا يعرض المتصفح نسخة قديمة مخزّنة (الخادم يخزّنها 7 أيام)
+      - name: دمج ملفات JavaScript في ملف واحد js/bundle.js لتسريع تحميل الصفحة الرئيسية
+        run: node scripts/bundle.mjs
+      - name: ختم نسخة لملفات JS وCSS حتى لا يعرض المتصفح نسخة قديمة مخزّنة (تُخزَّن سنة، والرقم يتغير مع كل نشر)
         run: |
           V=${GITHUB_SHA::7}
           for f in *.html; do sed -i -E "s#((src|href)=\"(js|css)/[^\"?]+\.(js|css))(\?v=[^\"]*)?\"#\1?v=$V\"#g" "$f"; done
@@ -124,7 +132,9 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
-      - name: ختم نسخة لملفات JS وCSS حتى لا يعرض المتصفح نسخة قديمة مخزّنة (الخادم يخزّنها 7 أيام)
+      - name: دمج ملفات JavaScript في ملف واحد js/bundle.js لتسريع تحميل الصفحة الرئيسية
+        run: node scripts/bundle.mjs
+      - name: ختم نسخة لملفات JS وCSS حتى لا يعرض المتصفح نسخة قديمة مخزّنة (تُخزَّن سنة، والرقم يتغير مع كل نشر)
         run: |
           V=${GITHUB_SHA::7}
           for f in *.html; do sed -i -E "s#((src|href)=\"(js|css)/[^\"?]+\.(js|css))(\?v=[^\"]*)?\"#\1?v=$V\"#g" "$f"; done
